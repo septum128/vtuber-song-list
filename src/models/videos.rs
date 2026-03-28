@@ -151,8 +151,15 @@ impl Model {
         }
         if params.only_song_lives.unwrap_or(false) {
             const KEYWORDS: &[&str] = &[
-                "歌枠", "うたわく", "歌ってみた", "弾き語り", "歌配信",
-                "カラオケ", "karaoke", "singing", "song",
+                "歌枠",
+                "うたわく",
+                "歌ってみた",
+                "弾き語り",
+                "歌配信",
+                "カラオケ",
+                "karaoke",
+                "singing",
+                "song",
             ];
             let cond = KEYWORDS.iter().fold(Condition::any(), |c, kw| {
                 c.add(videos::Column::Title.contains(*kw))

@@ -1,10 +1,7 @@
 use loco_rs::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::{
-    models::_entities::channels,
-    workers::youtube_client::YouTubeClient,
-};
+use crate::{models::_entities::channels, workers::youtube_client::YouTubeClient};
 
 pub struct FetchChannelIcons;
 

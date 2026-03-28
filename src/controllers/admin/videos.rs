@@ -99,7 +99,9 @@ async fn create(
         .one(&ctx.db)
         .await?;
     if existing.is_some() {
-        return Err(loco_rs::Error::BadRequest("この動画はすでに登録されています".to_string()));
+        return Err(loco_rs::Error::BadRequest(
+            "この動画はすでに登録されています".to_string(),
+        ));
     }
 
     let google_api_key =
@@ -111,15 +113,12 @@ async fn create(
         .await
         .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
-    let info = infos
-        .into_iter()
-        .next()
-        .ok_or_else(|| loco_rs::Error::BadRequest("YouTube動画が見つかりませんでした".to_string()))?;
+    let info = infos.into_iter().next().ok_or_else(|| {
+        loco_rs::Error::BadRequest("YouTube動画が見つかりませんでした".to_string())
+    })?;
 
-    let published_at =
-        chrono::DateTime::parse_from_rfc3339(&info.published_at).unwrap_or_else(|_| {
-            chrono::Utc::now().fixed_offset()
-        });
+    let published_at = chrono::DateTime::parse_from_rfc3339(&info.published_at)
+        .unwrap_or_else(|_| chrono::Utc::now().fixed_offset());
 
     let video = ActiveModel::create_from_params(
         &ctx.db,
@@ -133,7 +132,8 @@ async fn create(
     )
     .await?;
 
-    if let Err(e) = SongItemsCreatorWorker::perform_later(&ctx, SongItemsCreatorWorkerArgs {}).await {
+    if let Err(e) = SongItemsCreatorWorker::perform_later(&ctx, SongItemsCreatorWorkerArgs {}).await
+    {
         tracing::warn!("Failed to enqueue SongItemsCreatorWorker: {e}");
     }
 
@@ -166,7 +166,8 @@ fn extract_video_id(input: &str) -> String {
     // https://www.youtube.com/watch?v=VIDEO_ID
     if let Some(pos) = input.find("v=") {
         let rest = &input[pos + 2..];
-        let end = rest.find(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+        let end = rest
+            .find(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
             .unwrap_or(rest.len());
         return rest[..end].to_string();
     }
@@ -174,7 +175,8 @@ fn extract_video_id(input: &str) -> String {
     if let Some(pos) = input.rfind('/') {
         let rest = &input[pos + 1..];
         if !rest.is_empty() && !rest.contains('.') {
-            let end = rest.find(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+            let end = rest
+                .find(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
                 .unwrap_or(rest.len());
             return rest[..end].to_string();
         }

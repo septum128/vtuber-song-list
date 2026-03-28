@@ -111,7 +111,7 @@ impl YouTubeClient {
         }
     }
 
-    /// Fetches the default thumbnail URL for a YouTube channel.
+    /// Fetches the default thumbnail URL for a `YouTube` channel.
     ///
     /// # Errors
     /// Returns `reqwest::Error` on network or JSON parse failure.
