@@ -5,7 +5,7 @@ type Props = {
   description?: string;
 };
 
-const SITE_NAME = "VTuber Song List";
+export const SITE_NAME = "VTuber Song List";
 const DEFAULT_DESCRIPTION = "VTuberの歌枠セトリデータベース";
 
 export function Head({ title, description = DEFAULT_DESCRIPTION }: Props) {
