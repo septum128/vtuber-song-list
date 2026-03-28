@@ -1,0 +1,51 @@
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: info
+  format: json
+
+server:
+  port: {{ get_env(name="PORT", default="5150") }}
+  binding: 0.0.0.0
+  host: {{ get_env(name="APP_HOST", default="http://localhost:5150") }}
+  middlewares:
+    cors:
+      enable: true
+      allow_origins:
+        - {{ get_env(name="FRONTEND_URL", default="http://localhost:3001") }}
+      allow_headers:
+        - Content-Type
+        - Authorization
+      allow_methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+    static:
+      enable: true
+      must_exist: true
+      precompressed: false
+      folder:
+        uri: "/static"
+        path: "assets/static"
+      fallback: "assets/static/404.html"
+
+workers:
+  mode: BackgroundAsync
+
+database:
+  uri: {{ get_env(name="DATABASE_URL", default="") }}
+  enable_logging: false
+  connect_timeout: 5000
+  idle_timeout: 5000
+  min_connections: 1
+  max_connections: 5
+  auto_migrate: true
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+auth:
+  jwt:
+    secret: {{ get_env(name="JWT_SECRET", default="changeme") }}
+    expiration: 604800

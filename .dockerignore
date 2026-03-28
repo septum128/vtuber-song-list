@@ -1,0 +1,10 @@
+target/
+.git/
+.github/
+frontend/
+*.md
+.env
+.envrc
+.envrc.sample
+.env.sample
+docker-compose.yaml

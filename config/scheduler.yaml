@@ -1,0 +1,5 @@
+jobs:
+  create_recent_videos_song_items:
+    run: "create_recent_videos_song_items"
+    schedule: "0 0 3 * * *"
+    tags: []
