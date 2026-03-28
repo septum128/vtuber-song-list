@@ -13,7 +13,7 @@ COPY . .
 RUN cargo build --release
 
 # Stage 2: Runtime
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 WORKDIR /app
 
