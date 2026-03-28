@@ -30,7 +30,6 @@ export function Modal({ show, onClose, title, children }: Props) {
 
   return createPortal(
     <>
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         className="modal fade show"
         style={{ display: "block" }}
@@ -38,7 +37,6 @@ export function Modal({ show, onClose, title, children }: Props) {
         aria-modal="true"
         role="dialog"
       >
-        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
         <div
           className="modal-dialog modal-lg modal-dialog-scrollable"
           onClick={(e) => e.stopPropagation()}
@@ -59,6 +57,6 @@ export function Modal({ show, onClose, title, children }: Props) {
       </div>
       <div className="modal-backdrop fade show" />
     </>,
-    document.body
+    document.body,
   );
 }
