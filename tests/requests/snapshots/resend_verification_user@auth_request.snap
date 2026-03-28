@@ -1,6 +1,5 @@
 ---
 source: tests/requests/auth.rs
-assertion_line: 414
 expression: user
 ---
 Model {
@@ -23,4 +22,5 @@ Model {
     email_verified_at: None,
     magic_link_token: None,
     magic_link_expiration: None,
+    kind: 0,
 }
