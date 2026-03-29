@@ -1,4 +1,5 @@
 import type { AppProps } from "next/app";
+import { useEffect } from "react";
 import { Noto_Sans_JP } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeProvider";
 import { AlertsProvider } from "@/context/AlertsProvider";
@@ -11,6 +12,10 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    import("bootstrap");
+  }, []);
+
   return (
     <ThemeProvider>
       <AlertsProvider>
