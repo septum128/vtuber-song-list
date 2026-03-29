@@ -22,7 +22,7 @@ export async function apiFetch<T>(
     const err: ApiErrorResponse = await res
       .json()
       .catch(() => ({ message: `HTTP ${res.status}` }));
-    throw new Error(err.message);
+    throw new Error(err.description ?? err.message ?? `HTTP ${res.status}`);
   }
 
   if (res.status === 204) return undefined as T;

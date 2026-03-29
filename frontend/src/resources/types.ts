@@ -57,7 +57,7 @@ export type UserType = {
   kind: number;
 };
 
-export type ApiErrorResponse = { message: string };
+export type ApiErrorResponse = { message?: string; description?: string };
 
 export type AuthResponse = {
   message: string;
