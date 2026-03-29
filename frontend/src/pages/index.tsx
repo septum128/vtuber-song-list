@@ -5,7 +5,10 @@ export default function Home() {
   return (
     <DefaultLayout>
       <Head />
-      <h1 className="h3 mb-4">VTuber Song List Staging Environment</h1>
+      <h1 className="h3 mb-4">VTuber Song List</h1>
+      {process.env.NEXT_PUBLIC_APP_ENV === "staging" && (
+        <h2>Staging Environment</h2>
+      )}
       <p className="text-body-secondary">
         VTuberの歌枠セトリデータベースへようこそ。
       </p>
