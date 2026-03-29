@@ -1,6 +1,5 @@
-use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, Order,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     QueryFilter, QueryOrder,
 };
 
@@ -29,14 +28,14 @@ pub struct UpdateChannelParams {
 }
 
 impl Model {
-    /// Returns all published channels in random order.
+    /// Returns all published channels ordered by id.
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
     pub async fn find_all_published(db: &DatabaseConnection) -> Result<Vec<Self>, DbErr> {
         Entity::find()
             .filter(channels::Column::Kind.eq(KIND_PUBLISHED))
-            .order_by(Expr::cust("RANDOM()"), Order::Asc)
+            .order_by_asc(channels::Column::Id)
             .all(db)
             .await
     }
