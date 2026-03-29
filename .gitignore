@@ -39,5 +39,8 @@ frontend/node_modules/*
 # Next.js build output
 frontend/.next/
 
+# TypeScript incremental build cache
+frontend/tsconfig.tsbuildinfo
+
 # Test coverage
 frontend/coverage/
