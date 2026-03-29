@@ -175,7 +175,7 @@ async fn delete(
     require_admin(&auth, &ctx).await?;
     let deleted = song_items::Model::delete_by_id(&ctx.db, id).await?;
     if deleted {
-        format::empty()
+        Ok(StatusCode::NO_CONTENT.into_response())
     } else {
         not_found()
     }
