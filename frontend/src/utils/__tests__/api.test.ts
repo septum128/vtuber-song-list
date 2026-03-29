@@ -16,8 +16,8 @@ describe("apiFetch", () => {
   it("returns parsed JSON on success", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ id: 1, name: "test" }),
-    } as Response);
+      text: async () => JSON.stringify({ id: 1, name: "test" }),
+    } as unknown as Response);
 
     const result = await apiFetch<{ id: number; name: string }>("/api/test");
     expect(result).toEqual({ id: 1, name: "test" });
@@ -47,8 +47,8 @@ describe("apiFetch", () => {
     mockGetToken.mockReturnValue("my-token");
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({}),
-    } as Response);
+      text: async () => JSON.stringify({}),
+    } as unknown as Response);
 
     await apiFetch("/api/test", { auth: false });
 
@@ -60,8 +60,8 @@ describe("apiFetch", () => {
     mockGetToken.mockReturnValue("my-token");
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({}),
-    } as Response);
+      text: async () => JSON.stringify({}),
+    } as unknown as Response);
 
     await apiFetch("/api/test", { auth: true });
 
@@ -73,8 +73,8 @@ describe("apiFetch", () => {
     mockGetToken.mockReturnValue(null);
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({}),
-    } as Response);
+      text: async () => JSON.stringify({}),
+    } as unknown as Response);
 
     await apiFetch("/api/test", { auth: true });
 
