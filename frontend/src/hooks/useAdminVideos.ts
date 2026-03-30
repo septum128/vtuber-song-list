@@ -3,6 +3,17 @@ import { apiFetch } from "@/utils/api";
 import { getToken } from "@/utils/storage";
 import type { VideoType } from "@/resources/types";
 
+export type BulkCreateItem = {
+  url: string;
+  detail: string;
+};
+
+export type BulkCreateResult = {
+  succeeded: BulkCreateItem[];
+  skipped: BulkCreateItem[];
+  failed: BulkCreateItem[];
+};
+
 const KEY = "/api/admin/videos";
 
 function makeKey(channelId?: number, onlySongLives = false, page = 1) {
@@ -56,5 +67,15 @@ export function useAdminVideoActions() {
     return video;
   }
 
-  return { create, update };
+  async function bulkCreate(tsv: string): Promise<BulkCreateResult> {
+    const result = await apiFetch<BulkCreateResult>(`${KEY}/bulk`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ tsv }),
+    });
+    await mutate((key) => Array.isArray(key) && key[0] === KEY);
+    return result;
+  }
+
+  return { create, update, bulkCreate };
 }
