@@ -43,6 +43,7 @@ export function useAdminChannelActions() {
       custom_name?: string;
       twitter_id?: string | null;
       kind?: number;
+      fetch_icon?: boolean;
     }
   ): Promise<ChannelType> {
     const channel = await apiFetch<ChannelType>(`${KEY}/${id}`, {
