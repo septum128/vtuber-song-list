@@ -1,7 +1,7 @@
 use crate::{
     controllers::admin::require_admin,
     models::{
-        _entities::videos as videos_entity,
+        _entities::{channels as channels_entity, videos as videos_entity},
         videos::{self, ActiveModel, CreateVideoParams, UpdateVideoParams, VideosAdminParams},
     },
     workers::{
@@ -60,6 +60,24 @@ struct UpdateBody {
     published: Option<bool>,
     kind: Option<i32>,
     status: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BulkCreateBody {
+    tsv: String,
+}
+
+#[derive(Debug, Serialize)]
+struct BulkCreateResult {
+    succeeded: Vec<BulkCreateItem>,
+    skipped: Vec<BulkCreateItem>,
+    failed: Vec<BulkCreateItem>,
+}
+
+#[derive(Debug, Serialize)]
+struct BulkCreateItem {
+    url: String,
+    detail: String,
 }
 
 #[debug_handler]
@@ -162,6 +180,149 @@ async fn update(
     .map_or_else(not_found, |video| format::json(VideoResponse::from(video)))
 }
 
+enum BulkRowOutcome {
+    Succeeded(BulkCreateItem),
+    Skipped(BulkCreateItem),
+    Failed(BulkCreateItem),
+}
+
+async fn process_bulk_row(
+    ctx: &AppContext,
+    youtube_client: &YouTubeClient,
+    channel_name: &str,
+    url: &str,
+) -> BulkRowOutcome {
+    let channel = match channels_entity::Entity::find()
+        .filter(channels_entity::Column::CustomName.eq(channel_name))
+        .one(&ctx.db)
+        .await
+    {
+        Ok(Some(ch)) => ch,
+        Ok(None) => {
+            return BulkRowOutcome::Failed(BulkCreateItem {
+                url: url.to_string(),
+                detail: format!("チャンネルが見つかりません: {channel_name}"),
+            });
+        }
+        Err(e) => {
+            return BulkRowOutcome::Failed(BulkCreateItem {
+                url: url.to_string(),
+                detail: format!("DBエラー: {e}"),
+            });
+        }
+    };
+
+    let video_id = extract_video_id(url);
+
+    match videos_entity::Entity::find()
+        .filter(videos_entity::Column::VideoId.eq(&video_id))
+        .one(&ctx.db)
+        .await
+    {
+        Ok(Some(_)) => {
+            return BulkRowOutcome::Skipped(BulkCreateItem {
+                url: url.to_string(),
+                detail: "すでに登録済みです".to_string(),
+            });
+        }
+        Err(e) => {
+            return BulkRowOutcome::Failed(BulkCreateItem {
+                url: url.to_string(),
+                detail: format!("DBエラー: {e}"),
+            });
+        }
+        Ok(None) => {}
+    }
+
+    let infos = match youtube_client.fetch_video_info(&[video_id.as_str()]).await {
+        Ok(v) => v,
+        Err(e) => {
+            return BulkRowOutcome::Failed(BulkCreateItem {
+                url: url.to_string(),
+                detail: format!("YouTube APIエラー: {e}"),
+            });
+        }
+    };
+
+    let Some(info) = infos.into_iter().next() else {
+        return BulkRowOutcome::Failed(BulkCreateItem {
+            url: url.to_string(),
+            detail: "YouTube動画が見つかりませんでした".to_string(),
+        });
+    };
+
+    let published_at = chrono::DateTime::parse_from_rfc3339(&info.published_at)
+        .unwrap_or_else(|_| chrono::Utc::now().fixed_offset());
+    let title = info.title.clone();
+
+    match ActiveModel::create_from_params(
+        &ctx.db,
+        CreateVideoParams {
+            video_id: info.video_id,
+            channel_id: channel.id.into(),
+            title: info.title,
+            published_at,
+            response_json: info.response_json,
+        },
+    )
+    .await
+    {
+        Ok(_) => BulkRowOutcome::Succeeded(BulkCreateItem {
+            url: url.to_string(),
+            detail: title,
+        }),
+        Err(e) => BulkRowOutcome::Failed(BulkCreateItem {
+            url: url.to_string(),
+            detail: format!("DB登録エラー: {e}"),
+        }),
+    }
+}
+
+#[debug_handler]
+async fn bulk_create(
+    auth: auth::JWT,
+    State(ctx): State<AppContext>,
+    Json(body): Json<BulkCreateBody>,
+) -> Result<Response> {
+    require_admin(&auth, &ctx).await?;
+
+    let google_api_key =
+        std::env::var("GOOGLE_API_KEY").map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+    let youtube_client = YouTubeClient::new(google_api_key);
+
+    let mut succeeded = Vec::new();
+    let mut skipped = Vec::new();
+    let mut failed = Vec::new();
+
+    for line in body.tsv.lines().skip(1) {
+        let parts: Vec<&str> = line.splitn(2, '\t').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let channel_name = parts[0].trim();
+        let url = parts[1].trim();
+        match process_bulk_row(&ctx, &youtube_client, channel_name, url).await {
+            BulkRowOutcome::Succeeded(item) => succeeded.push(item),
+            BulkRowOutcome::Skipped(item) => skipped.push(item),
+            BulkRowOutcome::Failed(item) => failed.push(item),
+        }
+    }
+
+    if !succeeded.is_empty() {
+        if let Err(e) =
+            SongItemsCreatorWorker::perform_later(&ctx, SongItemsCreatorWorkerArgs {}).await
+        {
+            tracing::warn!("Failed to enqueue SongItemsCreatorWorker: {e}");
+        }
+    }
+
+    format::json(BulkCreateResult {
+        succeeded,
+        skipped,
+        failed,
+    })
+}
+
 fn extract_video_id(input: &str) -> String {
     // https://www.youtube.com/watch?v=VIDEO_ID
     if let Some(pos) = input.find("v=") {
@@ -189,5 +350,6 @@ pub fn routes() -> Routes {
         .prefix("/api/admin/videos")
         .add("/", get(list))
         .add("/", post(create))
+        .add("/bulk", post(bulk_create))
         .add("/{id}", patch(update))
 }
