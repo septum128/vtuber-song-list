@@ -1,9 +1,12 @@
 use crate::{
     controllers::admin::require_admin,
+    models::_entities::channels as channel_entity,
     models::channels::{self, ActiveModel, CreateChannelParams, UpdateChannelParams},
+    workers::youtube_client::YouTubeClient,
 };
 use axum::http::StatusCode;
 use loco_rs::prelude::*;
+use sea_orm::{ActiveModelTrait, ActiveValue};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -15,6 +18,7 @@ struct ChannelResponse {
     twitter_id: Option<String>,
     kind: i32,
     status: i32,
+    icon_url: Option<String>,
 }
 
 impl From<channels::Model> for ChannelResponse {
@@ -27,6 +31,7 @@ impl From<channels::Model> for ChannelResponse {
             twitter_id: m.twitter_id,
             kind: m.kind,
             status: m.status,
+            icon_url: m.icon_url,
         }
     }
 }
@@ -46,6 +51,29 @@ struct UpdateBody {
     custom_name: Option<String>,
     twitter_id: Option<serde_json::Value>,
     kind: Option<i32>,
+    fetch_icon: Option<bool>,
+}
+
+async fn try_fetch_icon(channel_id: &str) -> Option<String> {
+    let api_key = match std::env::var("GOOGLE_API_KEY") {
+        Ok(k) => k,
+        Err(_) => {
+            tracing::warn!("GOOGLE_API_KEY が設定されていないためアイコン取得をスキップします");
+            return None;
+        }
+    };
+    let client = YouTubeClient::new(api_key);
+    match client.fetch_channel_icon(channel_id).await {
+        Ok(Some(url)) => Some(url),
+        Ok(None) => {
+            tracing::warn!(channel_id, "チャンネルアイコンが見つかりませんでした");
+            None
+        }
+        Err(e) => {
+            tracing::warn!(err = e.to_string(), channel_id, "アイコン取得に失敗しました");
+            None
+        }
+    }
 }
 
 #[debug_handler]
@@ -63,6 +91,7 @@ async fn create(
     Json(body): Json<CreateBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
+    let channel_id_for_icon = body.channel_id.clone();
     let channel = ActiveModel::create_from_params(
         &ctx.db,
         CreateChannelParams {
@@ -78,6 +107,18 @@ async fn create(
         tracing::error!(err = e.to_string(), "failed to create channel");
         Error::BadRequest("チャンネルの作成に失敗しました".into())
     })?;
+
+    let channel = if let Some(url) = try_fetch_icon(&channel_id_for_icon).await {
+        let mut active: channel_entity::ActiveModel = channel.into();
+        active.icon_url = ActiveValue::set(Some(url));
+        active.update(&ctx.db).await.map_err(|e| {
+            tracing::error!(err = e.to_string(), "failed to update icon_url after create");
+            Error::BadRequest("アイコンURLの更新に失敗しました".into())
+        })?
+    } else {
+        channel
+    };
+
     let body = format::json(ChannelResponse::from(channel))?;
     Ok((StatusCode::CREATED, body).into_response())
 }
@@ -90,6 +131,8 @@ async fn update(
     Json(body): Json<UpdateBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
+
+    let fetch_icon = body.fetch_icon == Some(true);
 
     // Resolve nullable fields: JSON null → Some(None), missing → None
     let name = body.name.map(|v| {
@@ -107,7 +150,7 @@ async fn update(
         }
     });
 
-    ActiveModel::update_from_params(
+    let Some(channel) = ActiveModel::update_from_params(
         &ctx.db,
         id,
         UpdateChannelParams {
@@ -118,9 +161,26 @@ async fn update(
         },
     )
     .await?
-    .map_or_else(not_found, |channel| {
-        format::json(ChannelResponse::from(channel))
-    })
+    else {
+        return not_found();
+    };
+
+    let channel = if fetch_icon {
+        if let Some(url) = try_fetch_icon(&channel.channel_id).await {
+            let mut active: channel_entity::ActiveModel = channel.into();
+            active.icon_url = ActiveValue::set(Some(url));
+            active.update(&ctx.db).await.map_err(|e| {
+                tracing::error!(err = e.to_string(), "failed to update icon_url");
+                Error::BadRequest("アイコンURLの更新に失敗しました".into())
+            })?
+        } else {
+            channel
+        }
+    } else {
+        channel
+    };
+
+    format::json(ChannelResponse::from(channel))
 }
 
 #[debug_handler]

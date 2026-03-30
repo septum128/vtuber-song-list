@@ -10,6 +10,7 @@ type FormValues = {
   custom_name: string;
   twitter_id: string;
   kind: number;
+  fetch_icon: boolean;
 };
 
 type Props =
@@ -54,6 +55,7 @@ export function ChannelForm({ mode, channel, onSuccess }: Props) {
           custom_name: values.custom_name,
           twitter_id: values.twitter_id || null,
           kind: Number(values.kind),
+          fetch_icon: values.fetch_icon || undefined,
         });
         addAlert("success", "チャンネルを更新しました");
       }
@@ -122,6 +124,20 @@ export function ChannelForm({ mode, channel, onSuccess }: Props) {
           </select>
         </div>
       </div>
+
+      {mode === "edit" && (
+        <div className="mb-3 form-check">
+          <input
+            id="fetch_icon"
+            type="checkbox"
+            className="form-check-input"
+            {...register("fetch_icon")}
+          />
+          <label className="form-check-label small" htmlFor="fetch_icon">
+            アイコンを再取得する
+          </label>
+        </div>
+      )}
 
       <button
         type="submit"
