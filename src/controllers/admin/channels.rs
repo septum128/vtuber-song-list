@@ -55,12 +55,9 @@ struct UpdateBody {
 }
 
 async fn try_fetch_icon(channel_id: &str) -> Option<String> {
-    let api_key = match std::env::var("GOOGLE_API_KEY") {
-        Ok(k) => k,
-        Err(_) => {
-            tracing::warn!("GOOGLE_API_KEY が設定されていないためアイコン取得をスキップします");
-            return None;
-        }
+    let Ok(api_key) = std::env::var("GOOGLE_API_KEY") else {
+        tracing::warn!("GOOGLE_API_KEY が設定されていないためアイコン取得をスキップします");
+        return None;
     };
     let client = YouTubeClient::new(api_key);
     match client.fetch_channel_icon(channel_id).await {
@@ -70,7 +67,11 @@ async fn try_fetch_icon(channel_id: &str) -> Option<String> {
             None
         }
         Err(e) => {
-            tracing::warn!(err = e.to_string(), channel_id, "アイコン取得に失敗しました");
+            tracing::warn!(
+                err = e.to_string(),
+                channel_id,
+                "アイコン取得に失敗しました"
+            );
             None
         }
     }
@@ -112,7 +113,10 @@ async fn create(
         let mut active: channel_entity::ActiveModel = channel.into();
         active.icon_url = ActiveValue::set(Some(url));
         active.update(&ctx.db).await.map_err(|e| {
-            tracing::error!(err = e.to_string(), "failed to update icon_url after create");
+            tracing::error!(
+                err = e.to_string(),
+                "failed to update icon_url after create"
+            );
             Error::BadRequest("アイコンURLの更新に失敗しました".into())
         })?
     } else {
