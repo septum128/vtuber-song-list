@@ -9,6 +9,7 @@ import { Modal } from "@/components/Common/Modal";
 import { Pagination } from "@/components/SongLists/Pagination";
 import { VideoForm } from "./VideoForm";
 import { CreateVideoForm } from "./CreateVideoForm";
+import { BulkCreateVideoForm } from "./BulkCreateVideoForm";
 import type { VideoType } from "@/resources/types";
 
 const PER_PAGE = 30;
@@ -23,6 +24,7 @@ export function VideoList({ initialChannelId }: Props) {
   const [page, setPage] = useState(1);
   const [editTarget, setEditTarget] = useState<VideoType | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulkCreate, setShowBulkCreate] = useState(false);
 
   const { data: channels } = useAdminChannels();
   const { data: videos, isLoading } = useAdminVideos(channelId, onlySongLives, page);
@@ -37,6 +39,13 @@ export function VideoList({ initialChannelId }: Props) {
           onClick={() => setShowCreate(true)}
         >
           動画を追加
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => setShowBulkCreate(true)}
+        >
+          TSVで一括登録
         </button>
         <select
           className="form-select form-select-sm"
@@ -172,6 +181,14 @@ export function VideoList({ initialChannelId }: Props) {
         title="動画を追加"
       >
         <CreateVideoForm onSuccess={() => setShowCreate(false)} />
+      </Modal>
+
+      <Modal
+        show={showBulkCreate}
+        onClose={() => setShowBulkCreate(false)}
+        title="TSVで一括登録"
+      >
+        <BulkCreateVideoForm onSuccess={() => setShowBulkCreate(false)} />
       </Modal>
     </div>
   );
