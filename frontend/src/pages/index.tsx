@@ -4,7 +4,10 @@ import { DefaultLayout } from "@/layouts/DefaultLayout";
 export default function Home() {
   return (
     <DefaultLayout>
-      <Head />
+      <Head
+        url="https://www.vtuber-song.com/"
+        ogImage="https://www.vtuber-song.com/Vtuber-Song-List-OGP.png"
+      />
       <h1 className="h3 mb-4">VTuber Song List</h1>
       {process.env.NEXT_PUBLIC_APP_ENV === "staging" && (
         <h2>Staging Environment</h2>
