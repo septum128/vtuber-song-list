@@ -64,3 +64,27 @@ When adding a new controller:
 1. Create `src/controllers/<name>.rs`
 2. Export it from `src/controllers/mod.rs`
 3. Register its routes in `App::routes` in `app.rs`
+
+## Branch Naming Convention
+
+Format: `<type>/<issue-id>-<short-description>`
+
+| type | 用途 |
+|------|------|
+| `fix` | バグ修正 |
+| `feat` | 新機能 |
+| `hotfix` | 緊急修正 |
+| `refactor` | リファクタリング |
+| `chore` | 雑務・依存更新 |
+| `docs` | ドキュメント |
+
+Examples:
+- `fix/123-login-error`
+- `feat/101-user-profile`
+- `hotfix/789-payment-failure`
+
+Rules:
+- 英数字・ハイフンのみ（スペース・アンダースコア禁止）
+- 小文字統一
+- 短く端的に（3〜5単語程度）
+- Issue番号があれば含める
