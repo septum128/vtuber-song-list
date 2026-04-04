@@ -1,9 +1,5 @@
 jobs:
   create_recent_videos_song_items:
     run: "create_recent_videos_song_items"
-    schedule: "0 0 3 * * *"
-    tags: []
-  fetch_channel_icons:
-    run: "fetch_channel_icons"
-    schedule: "0 0 3 * * *"
+    schedule: "0 0 8 * * *"
     tags: []
