@@ -2,7 +2,10 @@ use crate::{
     controllers::admin::require_admin,
     models::_entities::channels as channel_entity,
     models::channels::{self, ActiveModel, CreateChannelParams, UpdateChannelParams},
-    workers::youtube_client::YouTubeClient,
+    workers::{
+        song_items_creator::{SongItemsCreatorWorker, SongItemsCreatorWorkerArgs},
+        youtube_client::YouTubeClient,
+    },
 };
 use axum::http::StatusCode;
 use loco_rs::prelude::*;
@@ -122,6 +125,14 @@ async fn create(
     } else {
         channel
     };
+
+    if let Err(e) = SongItemsCreatorWorker::perform_later(&ctx, SongItemsCreatorWorkerArgs {}).await
+    {
+        tracing::warn!(
+            err = e.to_string(),
+            "チャンネル追加後のタスク投入に失敗しました"
+        );
+    }
 
     let body = format::json(ChannelResponse::from(channel))?;
     Ok((StatusCode::CREATED, body).into_response())
