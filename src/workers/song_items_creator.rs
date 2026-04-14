@@ -154,6 +154,8 @@ impl SongItemsCreatorWorker {
     }
 
     /// Step 2: fetch RSS for all channels and insert new videos.
+    /// For live broadcasts, `published_at` is set to `actualStartTime` from the `YouTube` API.
+    /// Regular videos fall back to the RSS `<published>` date.
     /// Videos with `liveBroadcastContent = "upcoming"` (配信開始前) are skipped.
     async fn fetch_and_insert_videos(
         &self,
@@ -194,6 +196,7 @@ impl SongItemsCreatorWorker {
                 continue;
             }
 
+            // Fetch video details from YouTube API to get actualStartTime for live broadcasts.
             // Fetch video details from YouTube API to check liveBroadcastContent.
             let video_ids: Vec<&str> = new_entries.iter().map(|e| e.video_id.as_str()).collect();
             let video_infos = match youtube_client.fetch_video_info(&video_ids).await {
@@ -222,8 +225,21 @@ impl SongItemsCreatorWorker {
                     );
                     continue;
                 }
+            };
 
-                let published_at = parse_published_at(&entry.published);
+            // Build a map from video_id to actualStartTime.
+            let start_time_map: std::collections::HashMap<String, Option<String>> = video_infos
+                .into_iter()
+                .map(|info| (info.video_id, info.actual_start_time))
+                .collect();
+
+            for entry in new_entries {
+                // Use actualStartTime for live broadcasts; fall back to RSS published date.
+                let published_at_str = start_time_map
+                    .get(&entry.video_id)
+                    .and_then(Option::as_deref)
+                    .unwrap_or(&entry.published);
+                let published_at = parse_published_at(published_at_str);
 
                 let new_video = videos_entity::ActiveModel {
                     video_id: ActiveValue::set(entry.video_id.clone()),
