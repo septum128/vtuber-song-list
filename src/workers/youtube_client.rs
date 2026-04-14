@@ -17,6 +17,8 @@ pub struct VideoInfo {
     pub video_id: String,
     pub title: String,
     pub published_at: String,
+    pub actual_start_time: Option<String>,
+    pub live_broadcast_content: String,
     pub response_json: serde_json::Value,
 }
 
@@ -61,6 +63,13 @@ struct VideoListResponse {
 struct VideoItem {
     id: String,
     snippet: VideoSnippet,
+    live_streaming_details: Option<LiveStreamingDetails>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveStreamingDetails {
+    actual_start_time: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -68,6 +77,7 @@ struct VideoItem {
 struct VideoSnippet {
     title: String,
     published_at: String,
+    live_broadcast_content: String,
 }
 
 #[derive(Deserialize)]
@@ -162,7 +172,8 @@ impl YouTubeClient {
     ) -> Result<Vec<VideoInfo>, reqwest::Error> {
         let ids = video_ids.join(",");
         let url = format!(
-            "https://www.googleapis.com/youtube/v3/videos?part=snippet&id={ids}&key={}",
+            "https://www.googleapis.com/youtube/v3/videos\
+             ?part=snippet%2CliveStreamingDetails&id={ids}&key={}",
             self.api_key
         );
         let resp: VideoListResponse = self
@@ -183,6 +194,10 @@ impl YouTubeClient {
                     video_id: item.id,
                     title: item.snippet.title,
                     published_at: item.snippet.published_at,
+                    actual_start_time: item
+                        .live_streaming_details
+                        .and_then(|d| d.actual_start_time),
+                    live_broadcast_content: item.snippet.live_broadcast_content,
                     response_json: snippet_json,
                 }
             })
@@ -280,9 +295,10 @@ fn parse_rss_entries(xml: &str) -> Vec<RssEntry> {
 impl serde::Serialize for VideoSnippet {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap as _;
-        let mut map = serializer.serialize_map(Some(2))?;
+        let mut map = serializer.serialize_map(Some(3))?;
         map.serialize_entry("title", &self.title)?;
         map.serialize_entry("publishedAt", &self.published_at)?;
+        map.serialize_entry("liveBroadcastContent", &self.live_broadcast_content)?;
         map.end()
     }
 }
