@@ -196,8 +196,8 @@ impl SongItemsCreatorWorker {
                 continue;
             }
 
-            // Fetch video details from YouTube API to get actualStartTime for live broadcasts.
-            // Fetch video details from YouTube API to check liveBroadcastContent.
+            // Fetch video details from YouTube API to check liveBroadcastContent
+            // and get actualStartTime for live broadcasts.
             let video_ids: Vec<&str> = new_entries.iter().map(|e| e.video_id.as_str()).collect();
             let video_infos = match youtube_client.fetch_video_info(&video_ids).await {
                 Ok(infos) => infos,
@@ -210,35 +210,33 @@ impl SongItemsCreatorWorker {
                 }
             };
 
-            // Build a map from video_id to liveBroadcastContent.
-            let broadcast_map: std::collections::HashMap<String, String> = video_infos
+            // Build a map from video_id to (liveBroadcastContent, actualStartTime).
+            let info_map: std::collections::HashMap<String, (String, Option<String>)> = video_infos
                 .into_iter()
-                .map(|info| (info.video_id, info.live_broadcast_content))
+                .map(|info| {
+                    (
+                        info.video_id,
+                        (info.live_broadcast_content, info.actual_start_time),
+                    )
+                })
                 .collect();
 
             for entry in new_entries {
+                let (broadcast_content, actual_start_time) = info_map
+                    .get(&entry.video_id)
+                    .map_or(("", None), |(b, a)| (b.as_str(), a.as_deref()));
+
                 // Skip videos that have not yet started broadcasting.
-                if broadcast_map.get(&entry.video_id).map(String::as_str) == Some("upcoming") {
+                if broadcast_content == "upcoming" {
                     tracing::debug!(
                         "Skipping upcoming video {} (not yet started)",
                         entry.video_id
                     );
                     continue;
                 }
-            };
 
-            // Build a map from video_id to actualStartTime.
-            let start_time_map: std::collections::HashMap<String, Option<String>> = video_infos
-                .into_iter()
-                .map(|info| (info.video_id, info.actual_start_time))
-                .collect();
-
-            for entry in new_entries {
                 // Use actualStartTime for live broadcasts; fall back to RSS published date.
-                let published_at_str = start_time_map
-                    .get(&entry.video_id)
-                    .and_then(Option::as_deref)
-                    .unwrap_or(&entry.published);
+                let published_at_str = actual_start_time.unwrap_or(&entry.published);
                 let published_at = parse_published_at(published_at_str);
 
                 let new_video = videos_entity::ActiveModel {
