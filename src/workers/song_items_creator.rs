@@ -156,6 +156,7 @@ impl SongItemsCreatorWorker {
     /// Step 2: fetch RSS for all channels and insert new videos.
     /// For live broadcasts, `published_at` is set to `actualStartTime` from the `YouTube` API.
     /// Regular videos fall back to the RSS `<published>` date.
+    /// Videos with `liveBroadcastContent = "upcoming"` (配信開始前) are skipped.
     async fn fetch_and_insert_videos(
         &self,
         db: &sea_orm::DatabaseConnection,
@@ -196,6 +197,7 @@ impl SongItemsCreatorWorker {
             }
 
             // Fetch video details from YouTube API to get actualStartTime for live broadcasts.
+            // Fetch video details from YouTube API to check liveBroadcastContent.
             let video_ids: Vec<&str> = new_entries.iter().map(|e| e.video_id.as_str()).collect();
             let video_infos = match youtube_client.fetch_video_info(&video_ids).await {
                 Ok(infos) => infos,
@@ -203,6 +205,23 @@ impl SongItemsCreatorWorker {
                     tracing::warn!(
                         "Failed to fetch video info for channel {}: {e}",
                         channel.channel_id
+                    );
+                    continue;
+                }
+            };
+
+            // Build a map from video_id to liveBroadcastContent.
+            let broadcast_map: std::collections::HashMap<String, String> = video_infos
+                .into_iter()
+                .map(|info| (info.video_id, info.live_broadcast_content))
+                .collect();
+
+            for entry in new_entries {
+                // Skip videos that have not yet started broadcasting.
+                if broadcast_map.get(&entry.video_id).map(String::as_str) == Some("upcoming") {
+                    tracing::debug!(
+                        "Skipping upcoming video {} (not yet started)",
+                        entry.video_id
                     );
                     continue;
                 }
