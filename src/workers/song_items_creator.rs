@@ -154,6 +154,8 @@ impl SongItemsCreatorWorker {
     }
 
     /// Step 2: fetch RSS for all channels and insert new videos.
+    /// For live broadcasts, `published_at` is set to `actualStartTime` from the `YouTube` API.
+    /// Regular videos fall back to the RSS `<published>` date.
     async fn fetch_and_insert_videos(
         &self,
         db: &sea_orm::DatabaseConnection,
@@ -175,6 +177,8 @@ impl SongItemsCreatorWorker {
                 }
             };
 
+            // Collect only new video IDs (not yet in DB), preserving published date from RSS.
+            let mut new_entries = Vec::new();
             for entry in entries {
                 let existing = videos_entity::Entity::find()
                     .filter(videos_entity::Column::VideoId.eq(&entry.video_id))
@@ -182,11 +186,41 @@ impl SongItemsCreatorWorker {
                     .await
                     .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
-                if existing.is_some() {
+                if existing.is_none() {
+                    new_entries.push(entry);
+                }
+            }
+
+            if new_entries.is_empty() {
+                continue;
+            }
+
+            // Fetch video details from YouTube API to get actualStartTime for live broadcasts.
+            let video_ids: Vec<&str> = new_entries.iter().map(|e| e.video_id.as_str()).collect();
+            let video_infos = match youtube_client.fetch_video_info(&video_ids).await {
+                Ok(infos) => infos,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to fetch video info for channel {}: {e}",
+                        channel.channel_id
+                    );
                     continue;
                 }
+            };
 
-                let published_at = parse_published_at(&entry.published);
+            // Build a map from video_id to actualStartTime.
+            let start_time_map: std::collections::HashMap<String, Option<String>> = video_infos
+                .into_iter()
+                .map(|info| (info.video_id, info.actual_start_time))
+                .collect();
+
+            for entry in new_entries {
+                // Use actualStartTime for live broadcasts; fall back to RSS published date.
+                let published_at_str = start_time_map
+                    .get(&entry.video_id)
+                    .and_then(Option::as_deref)
+                    .unwrap_or(&entry.published);
+                let published_at = parse_published_at(published_at_str);
 
                 let new_video = videos_entity::ActiveModel {
                     video_id: ActiveValue::set(entry.video_id.clone()),
