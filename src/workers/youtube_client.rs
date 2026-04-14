@@ -17,6 +17,7 @@ pub struct VideoInfo {
     pub video_id: String,
     pub title: String,
     pub published_at: String,
+    pub live_broadcast_content: String,
     pub response_json: serde_json::Value,
 }
 
@@ -68,6 +69,7 @@ struct VideoItem {
 struct VideoSnippet {
     title: String,
     published_at: String,
+    live_broadcast_content: String,
 }
 
 #[derive(Deserialize)]
@@ -183,6 +185,7 @@ impl YouTubeClient {
                     video_id: item.id,
                     title: item.snippet.title,
                     published_at: item.snippet.published_at,
+                    live_broadcast_content: item.snippet.live_broadcast_content,
                     response_json: snippet_json,
                 }
             })
@@ -280,9 +283,10 @@ fn parse_rss_entries(xml: &str) -> Vec<RssEntry> {
 impl serde::Serialize for VideoSnippet {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap as _;
-        let mut map = serializer.serialize_map(Some(2))?;
+        let mut map = serializer.serialize_map(Some(3))?;
         map.serialize_entry("title", &self.title)?;
         map.serialize_entry("publishedAt", &self.published_at)?;
+        map.serialize_entry("liveBroadcastContent", &self.live_broadcast_content)?;
         map.end()
     }
 }

@@ -154,6 +154,7 @@ impl SongItemsCreatorWorker {
     }
 
     /// Step 2: fetch RSS for all channels and insert new videos.
+    /// Videos with `liveBroadcastContent = "upcoming"` (配信開始前) are skipped.
     async fn fetch_and_insert_videos(
         &self,
         db: &sea_orm::DatabaseConnection,
@@ -175,6 +176,8 @@ impl SongItemsCreatorWorker {
                 }
             };
 
+            // Collect only new video IDs (not yet in DB), preserving published date from RSS.
+            let mut new_entries = Vec::new();
             for entry in entries {
                 let existing = videos_entity::Entity::find()
                     .filter(videos_entity::Column::VideoId.eq(&entry.video_id))
@@ -182,7 +185,41 @@ impl SongItemsCreatorWorker {
                     .await
                     .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
-                if existing.is_some() {
+                if existing.is_none() {
+                    new_entries.push(entry);
+                }
+            }
+
+            if new_entries.is_empty() {
+                continue;
+            }
+
+            // Fetch video details from YouTube API to check liveBroadcastContent.
+            let video_ids: Vec<&str> = new_entries.iter().map(|e| e.video_id.as_str()).collect();
+            let video_infos = match youtube_client.fetch_video_info(&video_ids).await {
+                Ok(infos) => infos,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to fetch video info for channel {}: {e}",
+                        channel.channel_id
+                    );
+                    continue;
+                }
+            };
+
+            // Build a map from video_id to liveBroadcastContent.
+            let broadcast_map: std::collections::HashMap<String, String> = video_infos
+                .into_iter()
+                .map(|info| (info.video_id, info.live_broadcast_content))
+                .collect();
+
+            for entry in new_entries {
+                // Skip videos that have not yet started broadcasting.
+                if broadcast_map.get(&entry.video_id).map(String::as_str) == Some("upcoming") {
+                    tracing::debug!(
+                        "Skipping upcoming video {} (not yet started)",
+                        entry.video_id
+                    );
                     continue;
                 }
 
