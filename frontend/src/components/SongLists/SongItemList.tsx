@@ -10,6 +10,7 @@ type Props = {
   favoriteIds?: Set<number>;
   showFavorite?: boolean;
   showEdit?: boolean;
+  showChannel?: boolean;
 };
 
 export function SongItemList({
@@ -20,6 +21,7 @@ export function SongItemList({
   favoriteIds,
   showFavorite = false,
   showEdit = false,
+  showChannel = false,
 }: Props) {
   if (items.length === 0) {
     return <p className="text-body-secondary">曲が見つかりませんでした。</p>;
@@ -35,6 +37,7 @@ export function SongItemList({
               <th scope="col">時間</th>
               <th scope="col">曲名</th>
               <th scope="col">アーティスト</th>
+              {showChannel && <th scope="col">Vtuber</th>}
               <th scope="col">動画</th>
               {showEdit && <th scope="col" style={{ width: "5rem" }} />}
             </tr>
@@ -46,6 +49,7 @@ export function SongItemList({
                 item={item}
                 showFavorite={showFavorite}
                 showEdit={showEdit}
+                showChannel={showChannel}
                 favorited={favoriteIds?.has(item.id) ?? false}
               />
             ))}

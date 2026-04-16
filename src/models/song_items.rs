@@ -55,6 +55,8 @@ pub struct SongItemRow {
     pub v_channel_id: i64,
     pub v_kind: i32,
     pub v_published_at: sea_orm::prelude::DateTimeWithTimeZone,
+    // channel fields
+    pub v_channel_custom_name: String,
     // diff fields
     pub diff_title: Option<String>,
     pub diff_author: Option<String>,
@@ -72,11 +74,13 @@ fn build_query(params: &SongItemsParams) -> (String, Vec<sea_orm::Value>) {
             v.channel_id AS v_channel_id,
             v.kind      AS v_kind,
             v.published_at AS v_published_at,
+            c.custom_name AS v_channel_custom_name,
             sd.title    AS diff_title,
             sd.author   AS diff_author,
             sd.time     AS diff_time
         FROM song_items si
-        INNER JOIN videos v ON si.video_id = v.id
+        INNER JOIN videos   v ON si.video_id  = v.id
+        INNER JOIN channels c ON v.channel_id = c.id
         LEFT  JOIN song_diffs sd ON si.latest_diff_id = sd.id
         WHERE si.latest_diff_id IS NOT NULL
           AND v.published = true
@@ -175,11 +179,13 @@ impl SongItemRow {
                 v.channel_id AS v_channel_id,
                 v.kind      AS v_kind,
                 v.published_at AS v_published_at,
+                c.custom_name AS v_channel_custom_name,
                 sd.title    AS diff_title,
                 sd.author   AS diff_author,
                 sd.time     AS diff_time
             FROM song_items si
-            INNER JOIN videos v ON si.video_id = v.id
+            INNER JOIN videos   v ON si.video_id  = v.id
+            INNER JOIN channels c ON v.channel_id = c.id
             LEFT  JOIN song_diffs sd ON si.latest_diff_id = sd.id
             WHERE si.id = $1
         ";
@@ -216,11 +222,13 @@ impl SongItemRow {
                 v.channel_id AS v_channel_id,
                 v.kind      AS v_kind,
                 v.published_at AS v_published_at,
+                c.custom_name AS v_channel_custom_name,
                 sd.title    AS diff_title,
                 sd.author   AS diff_author,
                 sd.time     AS diff_time
             FROM song_items si
-            INNER JOIN videos v ON si.video_id = v.id
+            INNER JOIN videos   v ON si.video_id  = v.id
+            INNER JOIN channels c ON v.channel_id = c.id
             LEFT  JOIN song_diffs sd ON si.latest_diff_id = sd.id
             WHERE si.video_id = $1
             ORDER BY sd.time ASC NULLS LAST
