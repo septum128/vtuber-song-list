@@ -40,12 +40,14 @@ impl Model {
                 v.channel_id    AS v_channel_id,
                 v.kind          AS v_kind,
                 v.published_at  AS v_published_at,
+                c.custom_name   AS v_channel_custom_name,
                 sd.title        AS diff_title,
                 sd.author       AS diff_author,
                 sd.time         AS diff_time
             FROM favorites f
             INNER JOIN song_items si ON f.song_item_id = si.id
             INNER JOIN videos     v  ON si.video_id    = v.id
+            INNER JOIN channels   c  ON v.channel_id   = c.id
             LEFT  JOIN song_diffs sd ON si.latest_diff_id = sd.id
             WHERE f.user_id = $1
               AND si.latest_diff_id IS NOT NULL

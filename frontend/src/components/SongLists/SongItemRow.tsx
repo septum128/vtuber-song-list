@@ -13,6 +13,7 @@ type Props = {
   favorited?: boolean;
   showFavorite?: boolean;
   showEdit?: boolean;
+  showChannel?: boolean;
 };
 
 function timeToSeconds(time: string): number {
@@ -64,6 +65,7 @@ export function SongItemRow({
   favorited = false,
   showFavorite = false,
   showEdit = false,
+  showChannel = false,
 }: Props) {
   const { diff, video } = item;
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,6 +102,9 @@ export function SongItemRow({
         <td className="align-middle small">
           {diff.author ?? <span className="text-body-secondary">—</span>}
         </td>
+        {showChannel && (
+          <td className="align-middle small">{video.channel_custom_name}</td>
+        )}
         <td className="align-middle small">
           <a
             href={youtubeUrl(video.video_id)}
