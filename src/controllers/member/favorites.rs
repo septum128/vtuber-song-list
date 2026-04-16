@@ -31,6 +31,7 @@ struct VideoInfo {
     video_id: String,
     title: String,
     channel_id: i64,
+    channel_custom_name: String,
     kind: i32,
     published_at: sea_orm::prelude::DateTimeWithTimeZone,
 }
@@ -60,6 +61,7 @@ impl From<SongItemRow> for SongItemResponse {
                 video_id: r.v_video_id,
                 title: r.v_title,
                 channel_id: r.v_channel_id,
+                channel_custom_name: r.v_channel_custom_name,
                 kind: r.v_kind,
                 published_at: r.v_published_at,
             },

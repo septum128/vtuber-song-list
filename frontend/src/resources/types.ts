@@ -34,6 +34,7 @@ export type SongItemType = {
     video_id: string;
     title: string;
     channel_id: number;
+    channel_custom_name: string;
     kind: number;
     published_at: string;
   };

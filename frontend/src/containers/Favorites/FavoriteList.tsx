@@ -26,6 +26,7 @@ export function FavoriteList() {
       onPageChange={() => undefined}
       favoriteIds={favoriteIds}
       showFavorite
+      showChannel
     />
   );
 }
