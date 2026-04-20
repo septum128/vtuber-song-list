@@ -88,3 +88,9 @@ Rules:
 - 小文字統一
 - 短く端的に（3〜5単語程度）
 - Issue番号があれば含める
+
+## Starting a New Task
+
+Before writing any code, always:
+1. Create a GitHub issue: `gh issue create --title "..." --body "..."`
+2. Create a branch following the naming convention: `git checkout -b <type>/<issue-id>-<short-description>`

@@ -19,6 +19,7 @@ pub struct VideoInfo {
     pub published_at: String,
     pub actual_start_time: Option<String>,
     pub live_broadcast_content: String,
+    pub duration_seconds: Option<u64>,
     pub response_json: serde_json::Value,
 }
 
@@ -63,7 +64,13 @@ struct VideoListResponse {
 struct VideoItem {
     id: String,
     snippet: VideoSnippet,
+    content_details: Option<VideoContentDetails>,
     live_streaming_details: Option<LiveStreamingDetails>,
+}
+
+#[derive(Deserialize)]
+struct VideoContentDetails {
+    duration: String,
 }
 
 #[derive(Deserialize)]
@@ -173,7 +180,7 @@ impl YouTubeClient {
         let ids = video_ids.join(",");
         let url = format!(
             "https://www.googleapis.com/youtube/v3/videos\
-             ?part=snippet%2CliveStreamingDetails&id={ids}&key={}",
+             ?part=snippet%2CcontentDetails%2CliveStreamingDetails&id={ids}&key={}",
             self.api_key
         );
         let resp: VideoListResponse = self
@@ -198,6 +205,9 @@ impl YouTubeClient {
                         .live_streaming_details
                         .and_then(|d| d.actual_start_time),
                     live_broadcast_content: item.snippet.live_broadcast_content,
+                    duration_seconds: item
+                        .content_details
+                        .map(|d| parse_iso8601_duration(&d.duration)),
                     response_json: snippet_json,
                 }
             })
@@ -289,6 +299,18 @@ fn parse_rss_entries(xml: &str) -> Vec<RssEntry> {
             published: published_dates.get(i).map_or("", |s| *s).to_string(),
         })
         .collect()
+}
+
+/// Parses an ISO 8601 duration string (e.g. `PT1M30S`) into total seconds.
+/// Returns 0 if the string cannot be parsed.
+fn parse_iso8601_duration(duration: &str) -> u64 {
+    let re = Regex::new(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?").expect("static regex is valid");
+    re.captures(duration).map_or(0, |caps| {
+        let hours: u64 = caps.get(1).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        let minutes: u64 = caps.get(2).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        let seconds: u64 = caps.get(3).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        hours * 3600 + minutes * 60 + seconds
+    })
 }
 
 // Make VideoSnippet serializable for response_json

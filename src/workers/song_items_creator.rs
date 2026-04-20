@@ -210,27 +210,38 @@ impl SongItemsCreatorWorker {
                 }
             };
 
-            // Build a map from video_id to (liveBroadcastContent, actualStartTime).
-            let info_map: std::collections::HashMap<String, (String, Option<String>)> = video_infos
-                .into_iter()
-                .map(|info| {
-                    (
-                        info.video_id,
-                        (info.live_broadcast_content, info.actual_start_time),
-                    )
-                })
-                .collect();
+            // Build a map from video_id to (liveBroadcastContent, actualStartTime, durationSeconds).
+            let info_map: std::collections::HashMap<String, (String, Option<String>, Option<u64>)> =
+                video_infos
+                    .into_iter()
+                    .map(|info| {
+                        (
+                            info.video_id,
+                            (info.live_broadcast_content, info.actual_start_time, info.duration_seconds),
+                        )
+                    })
+                    .collect();
 
             for entry in new_entries {
-                let (broadcast_content, actual_start_time) = info_map
+                let (broadcast_content, actual_start_time, duration_seconds) = info_map
                     .get(&entry.video_id)
-                    .map_or(("", None), |(b, a)| (b.as_str(), a.as_deref()));
+                    .map_or(("", None, None), |(b, a, d)| (b.as_str(), a.as_deref(), *d));
 
                 // Skip videos that have not yet started broadcasting.
                 if broadcast_content == "upcoming" {
                     tracing::debug!(
                         "Skipping upcoming video {} (not yet started)",
                         entry.video_id
+                    );
+                    continue;
+                }
+
+                // Skip YouTube Shorts (duration <= 60 seconds).
+                if duration_seconds.is_some_and(|d| d <= 60) {
+                    tracing::debug!(
+                        "Skipping short video {} (duration {:?}s)",
+                        entry.video_id,
+                        duration_seconds
                     );
                     continue;
                 }
