@@ -306,9 +306,18 @@ fn parse_rss_entries(xml: &str) -> Vec<RssEntry> {
 fn parse_iso8601_duration(duration: &str) -> u64 {
     let re = Regex::new(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?").expect("static regex is valid");
     re.captures(duration).map_or(0, |caps| {
-        let hours: u64 = caps.get(1).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
-        let minutes: u64 = caps.get(2).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
-        let seconds: u64 = caps.get(3).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        let hours: u64 = caps
+            .get(1)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
+        let minutes: u64 = caps
+            .get(2)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
+        let seconds: u64 = caps
+            .get(3)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
         hours * 3600 + minutes * 60 + seconds
     })
 }

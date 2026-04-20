@@ -217,7 +217,11 @@ impl SongItemsCreatorWorker {
                     .map(|info| {
                         (
                             info.video_id,
-                            (info.live_broadcast_content, info.actual_start_time, info.duration_seconds),
+                            (
+                                info.live_broadcast_content,
+                                info.actual_start_time,
+                                info.duration_seconds,
+                            ),
                         )
                     })
                     .collect();
