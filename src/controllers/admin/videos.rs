@@ -60,6 +60,7 @@ struct UpdateBody {
     published: Option<bool>,
     kind: Option<i32>,
     status: Option<i32>,
+    published_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,6 +167,12 @@ async fn update(
     Json(body): Json<UpdateBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
+    let published_at = body
+        .published_at
+        .as_deref()
+        .map(chrono::DateTime::parse_from_rfc3339)
+        .transpose()
+        .map_err(|_| loco_rs::Error::BadRequest("配信日の形式が正しくありません".to_string()))?;
     ActiveModel::update_from_params(
         &ctx.db,
         id,
@@ -174,6 +181,7 @@ async fn update(
             published: body.published,
             kind: body.kind,
             status: body.status,
+            published_at,
         },
     )
     .await?
