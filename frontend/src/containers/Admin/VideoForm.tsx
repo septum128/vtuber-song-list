@@ -9,6 +9,7 @@ type FormValues = {
   published: boolean;
   kind: number;
   status: number;
+  published_at: string;
 };
 
 type Props = {
@@ -30,6 +31,7 @@ export function VideoForm({ video, onSuccess }: Props) {
       published: video.published,
       kind: video.kind,
       status: video.status,
+      published_at: video.published_at.slice(0, 16),
     },
   });
 
@@ -40,6 +42,7 @@ export function VideoForm({ video, onSuccess }: Props) {
         published: values.published,
         kind: Number(values.kind),
         status: Number(values.status),
+        published_at: new Date(values.published_at).toISOString(),
       });
       addAlert("success", "動画を更新しました");
       onSuccess();
@@ -93,6 +96,15 @@ export function VideoForm({ video, onSuccess }: Props) {
             </label>
           </div>
         </div>
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label small fw-semibold">配信日</label>
+        <input
+          type="datetime-local"
+          className="form-control form-control-sm"
+          {...register("published_at")}
+        />
       </div>
 
       <button type="submit" className="btn btn-sm btn-primary" disabled={isSubmitting}>
