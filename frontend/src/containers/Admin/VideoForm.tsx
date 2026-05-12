@@ -4,11 +4,24 @@ import { useAdminVideoActions } from "@/hooks/useAdminVideos";
 import { VideoKind, VideoStatus } from "@/resources/enums";
 import type { VideoType } from "@/resources/types";
 
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function toJstDatetimeLocal(utcIso: string): string {
+  const jstMs = new Date(utcIso).getTime() + JST_OFFSET_MS;
+  return new Date(jstMs).toISOString().slice(0, 16);
+}
+
+function fromJstDatetimeLocalToUtc(jstLocal: string): string {
+  const utcMs = new Date(`${jstLocal}:00Z`).getTime() - JST_OFFSET_MS;
+  return new Date(utcMs).toISOString();
+}
+
 type FormValues = {
   title: string;
   published: boolean;
   kind: number;
   status: number;
+  published_at: string;
 };
 
 type Props = {
@@ -30,6 +43,7 @@ export function VideoForm({ video, onSuccess }: Props) {
       published: video.published,
       kind: video.kind,
       status: video.status,
+      published_at: toJstDatetimeLocal(video.published_at),
     },
   });
 
@@ -40,6 +54,7 @@ export function VideoForm({ video, onSuccess }: Props) {
         published: values.published,
         kind: Number(values.kind),
         status: Number(values.status),
+        published_at: fromJstDatetimeLocalToUtc(values.published_at),
       });
       addAlert("success", "動画を更新しました");
       onSuccess();
@@ -93,6 +108,15 @@ export function VideoForm({ video, onSuccess }: Props) {
             </label>
           </div>
         </div>
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label small fw-semibold">配信日</label>
+        <input
+          type="datetime-local"
+          className="form-control form-control-sm"
+          {...register("published_at")}
+        />
       </div>
 
       <button type="submit" className="btn btn-sm btn-primary" disabled={isSubmitting}>

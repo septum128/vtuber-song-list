@@ -56,6 +56,7 @@ export function useAdminVideoActions() {
       published?: boolean;
       kind?: number;
       status?: number;
+      published_at?: string;
     }
   ): Promise<VideoType> {
     const video = await apiFetch<VideoType>(`${KEY}/${id}`, {

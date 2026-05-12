@@ -49,6 +49,7 @@ pub struct UpdateVideoParams {
     pub published: Option<bool>,
     pub kind: Option<i32>,
     pub status: Option<i32>,
+    pub published_at: Option<sea_orm::prelude::DateTimeWithTimeZone>,
 }
 
 impl VideosParams {
@@ -264,6 +265,9 @@ impl ActiveModel {
         }
         if let Some(status) = params.status {
             active.status = ActiveValue::set(status);
+        }
+        if let Some(published_at) = params.published_at {
+            active.published_at = ActiveValue::set(published_at);
         }
         let model = active.update(db).await?;
         Ok(Some(model))

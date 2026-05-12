@@ -22,7 +22,11 @@
     "swr": "^2.3.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@parcel/watcher", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
