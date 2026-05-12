@@ -21,6 +21,9 @@
     "styled-components": "^6.1.19",
     "swr": "^2.3.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@parcel/watcher", "sharp", "unrs-resolver"]
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@testing-library/jest-dom": "^6.6.0",
