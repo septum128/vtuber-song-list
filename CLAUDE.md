@@ -94,3 +94,5 @@ Rules:
 Before writing any code, always:
 1. Create a GitHub issue: `gh issue create --title "..." --body "..."`
 2. Create a branch following the naming convention: `git checkout -b <type>/<issue-id>-<short-description>`
+
+**Never implement directly on `main` or `staging`.** Always create a dedicated branch first, even for small fixes.
