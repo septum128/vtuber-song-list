@@ -26,7 +26,10 @@
       "@parcel/watcher",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "postcss": "^8.5.14"
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
