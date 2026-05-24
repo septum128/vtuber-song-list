@@ -367,10 +367,7 @@ pub async fn process_song_items_for_video(
                     .await
                     .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
             } else {
-                tracing::warn!(
-                    "Failed to fetch comments for video {}: {e}",
-                    video.video_id
-                );
+                tracing::warn!("Failed to fetch comments for video {}: {e}", video.video_id);
             }
             return Ok(0);
         }

@@ -378,9 +378,7 @@ async fn bulk_fetch_setlist(
     require_admin(&auth, &ctx).await?;
 
     if body.video_ids.is_empty() {
-        return Err(loco_rs::Error::BadRequest(
-            "video_ids が空です".to_string(),
-        ));
+        return Err(loco_rs::Error::BadRequest("video_ids が空です".to_string()));
     }
 
     SetlistFetchWorker::perform_later(

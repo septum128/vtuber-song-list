@@ -15,10 +15,11 @@ use std::path::Path;
 
 #[allow(unused_imports)]
 use crate::{
-    controllers, initializers, models::_entities::users, tasks,
+    controllers, initializers,
+    models::_entities::users,
+    tasks,
     workers::{
-        setlist_fetch_worker::SetlistFetchWorker,
-        song_items_creator::SongItemsCreatorWorker,
+        setlist_fetch_worker::SetlistFetchWorker, song_items_creator::SongItemsCreatorWorker,
     },
 };
 

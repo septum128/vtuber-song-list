@@ -11,7 +11,9 @@ use super::{
     youtube_client::YouTubeClient,
 };
 use crate::models::{
-    _entities::{song_diffs as song_diffs_entity, song_items as song_items_entity, videos as videos_entity},
+    _entities::{
+        song_diffs as song_diffs_entity, song_items as song_items_entity, videos as videos_entity,
+    },
     videos::{self as videos_model, STATUS_FETCHED, STATUS_SONG_ITEMS_CREATED},
 };
 
@@ -40,8 +42,8 @@ impl BackgroundWorker<SetlistFetchWorkerArgs> for SetlistFetchWorker {
             std::env::var("OPENAI_API_KEY").map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
         let spotify_client_id =
             std::env::var("SPOTIFY_CLIENT_ID").map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-        let spotify_client_secret = std::env::var("SPOTIFY_CLIENT_SECRET")
-            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+        let spotify_client_secret =
+            std::env::var("SPOTIFY_CLIENT_SECRET").map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
         let youtube_client = YouTubeClient::new(google_api_key);
         let openai_client = OpenAIClient::new(openai_api_key);
