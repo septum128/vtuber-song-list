@@ -78,5 +78,21 @@ export function useAdminVideoActions() {
     return result;
   }
 
-  return { create, update, bulkCreate };
+  async function fetchSetlist(videoId: number, force = false): Promise<void> {
+    await apiFetch<{ message: string }>(`${KEY}/${videoId}/fetch_setlist`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ force }),
+    });
+  }
+
+  async function bulkFetchSetlist(videoIds: number[], force = false): Promise<void> {
+    await apiFetch<{ message: string }>(`${KEY}/bulk_fetch_setlist`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ video_ids: videoIds, force }),
+    });
+  }
+
+  return { create, update, bulkCreate, fetchSetlist, bulkFetchSetlist };
 }

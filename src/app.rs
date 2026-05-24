@@ -15,8 +15,12 @@ use std::path::Path;
 
 #[allow(unused_imports)]
 use crate::{
-    controllers, initializers, models::_entities::users, tasks,
-    workers::song_items_creator::SongItemsCreatorWorker,
+    controllers, initializers,
+    models::_entities::users,
+    tasks,
+    workers::{
+        setlist_fetch_worker::SetlistFetchWorker, song_items_creator::SongItemsCreatorWorker,
+    },
 };
 
 pub struct App;
@@ -66,6 +70,7 @@ impl Hooks for App {
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(SongItemsCreatorWorker::build(ctx)).await?;
+        queue.register(SetlistFetchWorker::build(ctx)).await?;
         Ok(())
     }
 

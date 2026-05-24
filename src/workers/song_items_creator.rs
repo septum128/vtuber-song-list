@@ -276,7 +276,6 @@ impl SongItemsCreatorWorker {
     }
 
     /// Step 3: For each incomplete song-live video, fetch comments and create song items.
-    #[allow(clippy::too_many_lines)]
     async fn process_song_items(
         &self,
         db: &sea_orm::DatabaseConnection,
@@ -294,115 +293,11 @@ impl SongItemsCreatorWorker {
             if !is_song_live(&video.title) {
                 continue;
             }
-
-            let comments = match youtube_client.fetch_comments(&video.video_id).await {
-                Ok(c) => c,
-                Err(e) => {
-                    if e.status() == Some(reqwest::StatusCode::FORBIDDEN) {
-                        tracing::warn!(
-                            "Comments disabled for video {}, marking as skipped",
-                            video.video_id
-                        );
-                        videos_model::Model::update_status(db, video.id, STATUS_COMMENTS_DISABLED)
-                            .await
-                            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-                    } else {
-                        tracing::warn!(
-                            "Failed to fetch comments for video {}: {e}",
-                            video.video_id
-                        );
-                    }
-                    continue;
-                }
-            };
-
-            // Upsert all comments
-            let mut saved_comments = Vec::new();
-            for comment_info in comments {
-                let saved = comments_model::ActiveModel::upsert(
-                    db,
-                    UpsertCommentParams {
-                        comment_id: comment_info.comment_id,
-                        video_id: i64::from(video.id),
-                        author: comment_info.author,
-                        content: comment_info.content,
-                        response_json: comment_info.response_json,
-                    },
-                )
-                .await
-                .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-                saved_comments.push(saved);
-            }
-
-            // Process setlist comments with OpenAI
-            let mut video_created = 0usize;
-            for comment in &saved_comments {
-                if !comment.is_setlist() {
-                    continue;
-                }
-
-                let entries = match openai_client.extract_setlist(&comment.content).await {
-                    Ok(e) => e,
-                    Err(e) => {
-                        tracing::warn!("OpenAI failed for comment {}: {e}", comment.id);
-                        continue;
-                    }
-                };
-
-                for entry in entries {
-                    // Create song_item
-                    let item = song_items::ActiveModel {
-                        video_id: ActiveValue::set(i64::from(video.id)),
-                        latest_diff_id: ActiveValue::set(None),
-                        ..Default::default()
-                    }
-                    .insert(db)
-                    .await
-                    .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-
-                    // Create song_diff (auto, approved) and update latest_diff_id
-                    let time = if entry.time.is_empty() {
-                        None
-                    } else {
-                        Some(entry.time)
-                    };
-                    let title = if entry.title.is_empty() {
-                        None
-                    } else {
-                        Some(entry.title)
-                    };
-                    let author = if entry.author.is_empty() {
-                        None
-                    } else {
-                        Some(entry.author)
-                    };
-
-                    song_diffs_model::ActiveModel::create_auto(
-                        db,
-                        i64::from(item.id),
-                        Some(i64::from(comment.id)),
-                        time,
-                        title,
-                        author,
-                    )
-                    .await
-                    .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-
-                    video_created += 1;
-                }
-
-                // Mark comment completed
-                comments_model::Model::mark_completed(db, comment.id)
-                    .await
-                    .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-            }
-
-            if video_created > 0 {
-                videos_model::Model::update_status(db, video.id, STATUS_SONG_ITEMS_CREATED)
-                    .await
-                    .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+            let count =
+                process_song_items_for_video(db, &video, youtube_client, openai_client).await?;
+            if count > 0 {
                 processed += 1;
-                created += video_created;
+                created += count;
             }
         }
 
@@ -418,23 +313,7 @@ impl SongItemsCreatorWorker {
             .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
         for video in videos {
-            let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
-
-            for diff_row in empty_diffs {
-                let Some(title) = &diff_row.title else {
-                    continue;
-                };
-                if title.is_empty() {
-                    continue;
-                }
-                if let Some(author) = find_historical_author(db, title).await? {
-                    update_diff_author(db, diff_row.id, &author).await?;
-                }
-            }
-
-            videos_model::Model::update_status(db, video.id, STATUS_FETCHED_HISTORY)
-                .await
-                .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+            backfill_history_for_video(db, &video).await?;
         }
 
         Ok(())
@@ -453,37 +332,201 @@ impl SongItemsCreatorWorker {
             .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
         for video in videos {
-            let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
-
-            for diff_row in empty_diffs {
-                let Some(title) = &diff_row.title else {
-                    continue;
-                };
-                if title.is_empty() {
-                    continue;
-                }
-
-                match spotify_client.search_artist(title).await {
-                    Ok(Some(author)) => {
-                        update_diff_author(db, diff_row.id, &author).await?;
-                        update_diff_status(db, diff_row.id, STATUS_SPOTIFY_COMPLETED).await?;
-                    }
-                    Ok(None) => {
-                        update_diff_status(db, diff_row.id, STATUS_SPOTIFY_FETCHED).await?;
-                    }
-                    Err(e) => {
-                        tracing::warn!("Spotify search failed for '{}': {e}", title);
-                    }
-                }
-            }
-
-            videos_model::Model::update_status(db, video.id, STATUS_COMPLETED)
-                .await
-                .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+            backfill_spotify_for_video(db, &video, spotify_client).await?;
         }
 
         Ok(())
     }
+}
+
+/// Fetches comments for `video` and creates song items from setlist comments.
+///
+/// Returns the number of song items created.
+/// Sets status to `STATUS_SONG_ITEMS_CREATED` if any items were created,
+/// or `STATUS_COMMENTS_DISABLED` if the video has comments disabled.
+/// The caller is responsible for keyword filtering (歌枠 etc.) if desired.
+///
+/// # Errors
+/// Returns an error if the `YouTube` API, `OpenAI` API, or database operations fail.
+#[allow(clippy::too_many_lines)]
+pub async fn process_song_items_for_video(
+    db: &sea_orm::DatabaseConnection,
+    video: &videos_entity::Model,
+    youtube_client: &YouTubeClient,
+    openai_client: &OpenAIClient,
+) -> Result<usize> {
+    let comments = match youtube_client.fetch_comments(&video.video_id).await {
+        Ok(c) => c,
+        Err(e) => {
+            if e.status() == Some(reqwest::StatusCode::FORBIDDEN) {
+                tracing::warn!(
+                    "Comments disabled for video {}, marking as skipped",
+                    video.video_id
+                );
+                videos_model::Model::update_status(db, video.id, STATUS_COMMENTS_DISABLED)
+                    .await
+                    .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+            } else {
+                tracing::warn!("Failed to fetch comments for video {}: {e}", video.video_id);
+            }
+            return Ok(0);
+        }
+    };
+
+    let mut saved_comments = Vec::new();
+    for comment_info in comments {
+        let saved = comments_model::ActiveModel::upsert(
+            db,
+            UpsertCommentParams {
+                comment_id: comment_info.comment_id,
+                video_id: i64::from(video.id),
+                author: comment_info.author,
+                content: comment_info.content,
+                response_json: comment_info.response_json,
+            },
+        )
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+        saved_comments.push(saved);
+    }
+
+    let mut created = 0usize;
+    for comment in &saved_comments {
+        if !comment.is_setlist() {
+            continue;
+        }
+
+        let entries = match openai_client.extract_setlist(&comment.content).await {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("OpenAI failed for comment {}: {e}", comment.id);
+                continue;
+            }
+        };
+
+        for entry in entries {
+            let item = song_items::ActiveModel {
+                video_id: ActiveValue::set(i64::from(video.id)),
+                latest_diff_id: ActiveValue::set(None),
+                ..Default::default()
+            }
+            .insert(db)
+            .await
+            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+            let time = if entry.time.is_empty() {
+                None
+            } else {
+                Some(entry.time)
+            };
+            let title = if entry.title.is_empty() {
+                None
+            } else {
+                Some(entry.title)
+            };
+            let author = if entry.author.is_empty() {
+                None
+            } else {
+                Some(entry.author)
+            };
+
+            song_diffs_model::ActiveModel::create_auto(
+                db,
+                i64::from(item.id),
+                Some(i64::from(comment.id)),
+                time,
+                title,
+                author,
+            )
+            .await
+            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+            created += 1;
+        }
+
+        comments_model::Model::mark_completed(db, comment.id)
+            .await
+            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+    }
+
+    if created > 0 {
+        videos_model::Model::update_status(db, video.id, STATUS_SONG_ITEMS_CREATED)
+            .await
+            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+    }
+
+    Ok(created)
+}
+
+/// Fills empty `author` fields for `video` from historical approved diffs with the same title.
+/// Sets status to `STATUS_FETCHED_HISTORY`.
+///
+/// # Errors
+/// Returns an error if database operations fail.
+pub async fn backfill_history_for_video(
+    db: &sea_orm::DatabaseConnection,
+    video: &videos_entity::Model,
+) -> Result<()> {
+    let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
+
+    for diff_row in empty_diffs {
+        let Some(title) = &diff_row.title else {
+            continue;
+        };
+        if title.is_empty() {
+            continue;
+        }
+        if let Some(author) = find_historical_author(db, title).await? {
+            update_diff_author(db, diff_row.id, &author).await?;
+        }
+    }
+
+    videos_model::Model::update_status(db, video.id, STATUS_FETCHED_HISTORY)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    Ok(())
+}
+
+/// Fills empty `author` fields for `video` using Spotify search.
+/// Sets status to `STATUS_COMPLETED`.
+///
+/// # Errors
+/// Returns an error if database operations fail.
+pub async fn backfill_spotify_for_video(
+    db: &sea_orm::DatabaseConnection,
+    video: &videos_entity::Model,
+    spotify_client: &SpotifyClient,
+) -> Result<()> {
+    let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
+
+    for diff_row in empty_diffs {
+        let Some(title) = &diff_row.title else {
+            continue;
+        };
+        if title.is_empty() {
+            continue;
+        }
+
+        match spotify_client.search_artist(title).await {
+            Ok(Some(author)) => {
+                update_diff_author(db, diff_row.id, &author).await?;
+                update_diff_status(db, diff_row.id, STATUS_SPOTIFY_COMPLETED).await?;
+            }
+            Ok(None) => {
+                update_diff_status(db, diff_row.id, STATUS_SPOTIFY_FETCHED).await?;
+            }
+            Err(e) => {
+                tracing::warn!("Spotify search failed for '{}': {e}", title);
+            }
+        }
+    }
+
+    videos_model::Model::update_status(db, video.id, STATUS_COMPLETED)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    Ok(())
 }
 
 /// Finds `song_diffs` with empty author linked to the video via `song_items.latest_diff_id`.

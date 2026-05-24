@@ -5,6 +5,7 @@ use crate::{
         videos::{self, ActiveModel, CreateVideoParams, UpdateVideoParams, VideosAdminParams},
     },
     workers::{
+        setlist_fetch_worker::{SetlistFetchWorker, SetlistFetchWorkerArgs},
         song_items_creator::{SongItemsCreatorWorker, SongItemsCreatorWorkerArgs},
         youtube_client::YouTubeClient,
     },
@@ -66,6 +67,17 @@ struct UpdateBody {
 #[derive(Debug, Deserialize)]
 struct BulkCreateBody {
     tsv: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct FetchSetlistBody {
+    force: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BulkFetchSetlistBody {
+    video_ids: Vec<i32>,
+    force: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -331,6 +343,56 @@ async fn bulk_create(
     })
 }
 
+#[debug_handler]
+async fn fetch_setlist(
+    auth: auth::JWT,
+    State(ctx): State<AppContext>,
+    Path(id): Path<i32>,
+    Json(body): Json<FetchSetlistBody>,
+) -> Result<Response> {
+    require_admin(&auth, &ctx).await?;
+
+    videos_entity::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or(loco_rs::Error::NotFound)?;
+
+    SetlistFetchWorker::perform_later(
+        &ctx,
+        SetlistFetchWorkerArgs {
+            video_ids: vec![id],
+            force: body.force.unwrap_or(false),
+        },
+    )
+    .await?;
+
+    format::json(serde_json::json!({ "message": "セトリ取得ジョブをキューしました" }))
+}
+
+#[debug_handler]
+async fn bulk_fetch_setlist(
+    auth: auth::JWT,
+    State(ctx): State<AppContext>,
+    Json(body): Json<BulkFetchSetlistBody>,
+) -> Result<Response> {
+    require_admin(&auth, &ctx).await?;
+
+    if body.video_ids.is_empty() {
+        return Err(loco_rs::Error::BadRequest("video_ids が空です".to_string()));
+    }
+
+    SetlistFetchWorker::perform_later(
+        &ctx,
+        SetlistFetchWorkerArgs {
+            video_ids: body.video_ids,
+            force: body.force.unwrap_or(false),
+        },
+    )
+    .await?;
+
+    format::json(serde_json::json!({ "message": "セトリ取得ジョブをキューしました" }))
+}
+
 fn extract_video_id(input: &str) -> String {
     // https://www.youtube.com/watch?v=VIDEO_ID
     if let Some(pos) = input.find("v=") {
@@ -359,5 +421,7 @@ pub fn routes() -> Routes {
         .add("/", get(list))
         .add("/", post(create))
         .add("/bulk", post(bulk_create))
+        .add("/bulk_fetch_setlist", post(bulk_fetch_setlist))
         .add("/{id}", patch(update))
+        .add("/{id}/fetch_setlist", post(fetch_setlist))
 }
