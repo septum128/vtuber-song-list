@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
     styledComponents: true,
   },
   images: {
+    // Next's built-in image optimization needs `sharp`, which can't run in the
+    // Cloudflare Workers runtime. Thumbnails already come pre-sized from
+    // YouTube's CDN, so we skip optimization instead of paying for Cloudflare
+    // Images.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
