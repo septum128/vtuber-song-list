@@ -40,7 +40,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline' static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: img.youtube.com yt3.googleusercontent.com yt3.ggpht.com",
               "font-src 'self'",
