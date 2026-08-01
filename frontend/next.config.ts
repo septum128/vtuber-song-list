@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: img.youtube.com yt3.googleusercontent.com yt3.ggpht.com",
               "font-src 'self'",
-              "connect-src 'self'",
+              "connect-src 'self' cloudflareinsights.com",
               "frame-ancestors 'none'",
             ].join("; "),
           },
