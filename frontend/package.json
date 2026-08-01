@@ -23,18 +23,7 @@
     "styled-components": "^6.1.19",
     "swr": "^2.3.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild",
-      "sharp",
-      "unrs-resolver",
-      "workerd"
-    ],
-    "overrides": {
-      "postcss": "^8.5.14"
-    }
-  },
+  "packageManager": "pnpm@10.32.1",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@opennextjs/cloudflare": "^1.20.2",
