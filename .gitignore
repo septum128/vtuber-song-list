@@ -39,6 +39,10 @@ frontend/node_modules/*
 # Next.js build output
 frontend/.next/
 
+# Cloudflare / OpenNext build output
+frontend/.open-next/
+frontend/.wrangler/
+
 # TypeScript incremental build cache
 frontend/tsconfig.tsbuildinfo
 

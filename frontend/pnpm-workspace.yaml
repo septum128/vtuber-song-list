@@ -1,0 +1,14 @@
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - workerd
+
+overrides:
+  postcss: ^8.5.14
+
+minimumReleaseAgeExclude:
+  - wrangler
+  - miniflare
+  - '@aws-sdk/*'
