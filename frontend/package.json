@@ -10,7 +10,8 @@
     "test": "jest",
     "test:ci": "jest --ci --coverage",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:deploy:staging": "opennextjs-cloudflare build -e staging && opennextjs-cloudflare deploy -e staging"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
