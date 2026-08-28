@@ -28,4 +28,4 @@ COPY --from=builder /app/assets ./assets
 
 EXPOSE 5150
 
-CMD ["./vtuber_song_list-cli", "start", "--environment", "production"]
+CMD ["./vtuber_song_list-cli", "start", "--environment", "production", "--all"]

@@ -34,6 +34,15 @@ server:
 workers:
   mode: BackgroundAsync
 
+# `start --all` で起動されるスケジューラ。cron は UTC 固定。
+# "0 0 0 * * *" = 毎日 00:00 UTC = 09:00 JST。
+scheduler:
+  jobs:
+    create_recent_videos_song_items:
+      run: "create_recent_videos_song_items"
+      schedule: "0 0 0 * * *"
+      tags: []
+
 database:
   uri: {{ get_env(name="DATABASE_URL", default="") }}
   enable_logging: false

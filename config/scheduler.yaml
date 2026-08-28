@@ -1,5 +1,8 @@
+# スタンドアロンの `cargo loco scheduler --config config/scheduler.yaml` 実行用。
+# 本番 (`start --all`) は config/production.yaml の `scheduler:` を参照する。
+# cron は UTC 固定。"0 0 0 * * *" = 毎日 00:00 UTC = 09:00 JST。
 jobs:
   create_recent_videos_song_items:
     run: "create_recent_videos_song_items"
-    schedule: "0 0 8 * * *"
+    schedule: "0 0 0 * * *"
     tags: []
