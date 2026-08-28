@@ -8,5 +8,10 @@
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
+	},
+	"env": {
+		"staging": {
+			"name": "vtuber-song-list-frontend-staging"
+		}
 	}
 }
