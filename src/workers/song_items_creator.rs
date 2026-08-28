@@ -251,14 +251,14 @@ impl SongItemsCreatorWorker {
                 }
 
                 // Use actualStartTime for live broadcasts; fall back to RSS published date.
-                let published_at_str = actual_start_time.unwrap_or(&entry.published);
-                let published_at = parse_published_at(published_at_str);
+                let (published_at, response_json) =
+                    build_published_at(actual_start_time, &entry.published, &entry.video_id);
 
                 let new_video = videos_entity::ActiveModel {
                     video_id: ActiveValue::set(entry.video_id.clone()),
                     channel_id: ActiveValue::set(i64::from(channel.id)),
                     title: ActiveValue::set(entry.title),
-                    response_json: ActiveValue::set(serde_json::json!({})),
+                    response_json: ActiveValue::set(response_json),
                     kind: ActiveValue::set(0),
                     status: ActiveValue::set(STATUS_FETCHED),
                     published: ActiveValue::set(false),
@@ -628,4 +628,33 @@ async fn update_diff_status(
 fn parse_published_at(s: &str) -> sea_orm::prelude::DateTimeWithTimeZone {
     use chrono::{DateTime, Utc};
     DateTime::parse_from_rfc3339(s).unwrap_or_else(|_| Utc::now().fixed_offset())
+}
+
+/// Resolves `published_at` for a newly-ingested video, preferring `actualStartTime`
+/// (from the `YouTube` API) over the RSS `<published>` date, and returns a diagnostic
+/// JSON blob recording which source was used and both raw values, so a future
+/// investigation can query `response_json` directly instead of relying on logs.
+fn build_published_at(
+    actual_start_time: Option<&str>,
+    rss_published: &str,
+    video_id: &str,
+) -> (sea_orm::prelude::DateTimeWithTimeZone, serde_json::Value) {
+    let (published_at_str, source) = actual_start_time.map_or_else(
+        || {
+            tracing::warn!(
+                "Video {video_id} has no actualStartTime; falling back to RSS published={rss_published} for published_at"
+            );
+            (rss_published, "rss_published")
+        },
+        |t| (t, "actual_start_time"),
+    );
+
+    let published_at = parse_published_at(published_at_str);
+    let response_json = serde_json::json!({
+        "published_at_source": source,
+        "actual_start_time": actual_start_time,
+        "rss_published": rss_published,
+    });
+
+    (published_at, response_json)
 }
