@@ -11,6 +11,12 @@ import { Pagination } from "@/components/SongLists/Pagination";
 import { VideoForm } from "./VideoForm";
 import { CreateVideoForm } from "./CreateVideoForm";
 import { BulkCreateVideoForm } from "./BulkCreateVideoForm";
+import {
+  buildVideoListText,
+  copyText,
+  downloadTextFile,
+  exportFilename,
+} from "@/utils/videoExport";
 import type { VideoType } from "@/resources/types";
 
 const PER_PAGE = 30;
@@ -44,7 +50,8 @@ export function VideoList({ initialChannelId }: Props) {
   const [editTarget, setEditTarget] = useState<VideoType | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // ページを跨いだ選択も保持するため、id だけでなく動画データごと持つ。
+  const [selected, setSelected] = useState<Map<number, VideoType>>(new Map());
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
 
   const { addAlert } = useAlerts();
@@ -53,23 +60,50 @@ export function VideoList({ initialChannelId }: Props) {
   const { fetchSetlist, bulkFetchSetlist } = useAdminVideoActions();
 
   const allSelected =
-    !!videos && videos.length > 0 && videos.every((v) => selectedIds.has(v.id));
-  const someSelected = selectedIds.size > 0;
+    !!videos && videos.length > 0 && videos.every((v) => selected.has(v.id));
+  const someSelected = selected.size > 0;
 
-  function toggleSelect(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  function toggleSelect(video: VideoType) {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(video.id)) next.delete(video.id);
+      else next.set(video.id, video);
       return next;
     });
   }
 
   function toggleSelectAll() {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(videos?.map((v) => v.id) ?? []));
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (allSelected) {
+        videos?.forEach((v) => next.delete(v.id));
+      } else {
+        videos?.forEach((v) => next.set(v.id, v));
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelected(new Map());
+  }
+
+  function selectedVideoList(): VideoType[] {
+    return Array.from(selected.values()).sort((a, b) => a.id - b.id);
+  }
+
+  function handleExportText() {
+    const text = buildVideoListText(selectedVideoList());
+    downloadTextFile(exportFilename(), text);
+    addAlert("success", `${selected.size}件の動画を書き出しました`);
+  }
+
+  async function handleCopyText() {
+    try {
+      await copyText(buildVideoListText(selectedVideoList()));
+      addAlert("success", `${selected.size}件の動画をクリップボードにコピーしました`);
+    } catch (e) {
+      addAlert("danger", e instanceof Error ? e.message : "コピーに失敗しました");
     }
   }
 
@@ -90,16 +124,16 @@ export function VideoList({ initialChannelId }: Props) {
   }
 
   async function handleBulkFetchSetlist(force: boolean) {
-    if (selectedIds.size === 0) return;
+    if (selected.size === 0) return;
     try {
-      await bulkFetchSetlist(Array.from(selectedIds), force);
+      await bulkFetchSetlist(Array.from(selected.keys()), force);
       addAlert(
         "success",
         force
-          ? `${selectedIds.size}件の強制再取得ジョブをキューしました`
-          : `${selectedIds.size}件のセトリ取得ジョブをキューしました`
+          ? `${selected.size}件の強制再取得ジョブをキューしました`
+          : `${selected.size}件のセトリ取得ジョブをキューしました`
       );
-      setSelectedIds(new Set());
+      clearSelection();
     } catch (e) {
       addAlert("danger", e instanceof Error ? e.message : "エラーが発生しました");
     }
@@ -158,7 +192,7 @@ export function VideoList({ initialChannelId }: Props) {
 
       {someSelected && (
         <div className="d-flex align-items-center gap-2 mb-3 p-2 bg-body-secondary rounded">
-          <span className="small text-body-secondary">{selectedIds.size}件選択中</span>
+          <span className="small text-body-secondary">{selected.size}件選択中</span>
           <button
             type="button"
             className="btn btn-sm btn-outline-primary"
@@ -175,8 +209,22 @@ export function VideoList({ initialChannelId }: Props) {
           </button>
           <button
             type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={handleExportText}
+          >
+            テキストで書き出し
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={handleCopyText}
+          >
+            クリップボードにコピー
+          </button>
+          <button
+            type="button"
             className="btn btn-sm btn-link text-body-secondary"
-            onClick={() => setSelectedIds(new Set())}
+            onClick={clearSelection}
           >
             選択解除
           </button>
@@ -222,8 +270,8 @@ export function VideoList({ initialChannelId }: Props) {
                         <input
                           type="checkbox"
                           className="form-check-input"
-                          checked={selectedIds.has(video.id)}
-                          onChange={() => toggleSelect(video.id)}
+                          checked={selected.has(video.id)}
+                          onChange={() => toggleSelect(video)}
                         />
                       </td>
                       <td>{video.id}</td>
