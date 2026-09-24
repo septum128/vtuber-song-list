@@ -29,7 +29,9 @@
     "overrides": {
       "browserslist": ">=4.28.7",
       "baseline-browser-mapping": ">=2.11.0",
-      "@humanfs/node": ">=0.16.8"
+      "@humanfs/node": ">=0.16.8",
+      "sharp": ">=0.35.4",
+      "postcss": ">=8.5.23"
     }
   },
   "devDependencies": {
