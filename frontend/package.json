@@ -25,6 +25,13 @@
     "swr": "^2.3.0"
   },
   "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "overrides": {
+      "browserslist": ">=4.28.7",
+      "baseline-browser-mapping": ">=2.11.0",
+      "@humanfs/node": ">=0.16.8"
+    }
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@opennextjs/cloudflare": "^1.20.2",
