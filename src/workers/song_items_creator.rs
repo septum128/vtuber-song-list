@@ -54,6 +54,50 @@ fn is_song_live(title: &str) -> bool {
         .any(|kw| lower.contains(&kw.to_lowercase()))
 }
 
+/// A setlist entry extracted from a comment, still tied to its source comment.
+struct PendingSongEntry {
+    comment_id: i32,
+    time: String,
+    title: String,
+    author: String,
+}
+
+/// Normalizes a string for dedup comparison: trims, collapses whitespace
+/// (full-width included), and lowercases.
+fn normalize_for_dedup(s: &str) -> String {
+    s.trim()
+        .replace('\u{3000}', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+/// Filters out entries with an empty title or author, sorts the remainder by
+/// time, title, and author, then removes entries whose title+author
+/// (normalized) duplicate an earlier entry in the sorted order.
+fn dedup_song_entries(mut entries: Vec<PendingSongEntry>) -> Vec<PendingSongEntry> {
+    entries.retain(|e| !e.title.trim().is_empty() && !e.author.trim().is_empty());
+
+    entries.sort_by(|a, b| {
+        a.time
+            .cmp(&b.time)
+            .then_with(|| a.title.cmp(&b.title))
+            .then_with(|| a.author.cmp(&b.author))
+    });
+
+    let mut seen = std::collections::HashSet::new();
+    entries.retain(|e| {
+        let key = (
+            normalize_for_dedup(&e.title),
+            normalize_for_dedup(&e.author),
+        );
+        seen.insert(key)
+    });
+
+    entries
+}
+
 #[async_trait]
 impl BackgroundWorker<SongItemsCreatorWorkerArgs> for SongItemsCreatorWorker {
     fn build(ctx: &AppContext) -> Self {
@@ -390,7 +434,7 @@ pub async fn process_song_items_for_video(
         saved_comments.push(saved);
     }
 
-    let mut created = 0usize;
+    let mut pending_entries = Vec::new();
     for comment in &saved_comments {
         if !comment.is_setlist() {
             continue;
@@ -405,48 +449,50 @@ pub async fn process_song_items_for_video(
         };
 
         for entry in entries {
-            let item = song_items::ActiveModel {
-                video_id: ActiveValue::set(i64::from(video.id)),
-                latest_diff_id: ActiveValue::set(None),
-                ..Default::default()
-            }
-            .insert(db)
-            .await
-            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-
-            let time = if entry.time.is_empty() {
-                None
-            } else {
-                Some(entry.time)
-            };
-            let title = if entry.title.is_empty() {
-                None
-            } else {
-                Some(entry.title)
-            };
-            let author = if entry.author.is_empty() {
-                None
-            } else {
-                Some(entry.author)
-            };
-
-            song_diffs_model::ActiveModel::create_auto(
-                db,
-                i64::from(item.id),
-                Some(i64::from(comment.id)),
-                time,
-                title,
-                author,
-            )
-            .await
-            .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-
-            created += 1;
+            pending_entries.push(PendingSongEntry {
+                comment_id: comment.id,
+                time: entry.time,
+                title: entry.title,
+                author: entry.author,
+            });
         }
 
+        // Extraction succeeded (regardless of how many entries it produced),
+        // so this comment doesn't need to be reprocessed on the next run.
         comments_model::Model::mark_completed(db, comment.id)
             .await
             .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+    }
+
+    let mut created = 0usize;
+    for entry in dedup_song_entries(pending_entries) {
+        let item = song_items::ActiveModel {
+            video_id: ActiveValue::set(i64::from(video.id)),
+            latest_diff_id: ActiveValue::set(None),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+        let time = if entry.time.is_empty() {
+            None
+        } else {
+            Some(entry.time)
+        };
+
+        song_diffs_model::ActiveModel::create_auto(
+            db,
+            i64::from(item.id),
+            Some(i64::from(entry.comment_id)),
+            time,
+            Some(entry.title.trim().to_string()),
+            Some(entry.author.trim().to_string()),
+        )
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+        created += 1;
     }
 
     if created > 0 {
@@ -657,4 +703,83 @@ fn build_published_at(
     });
 
     (published_at, response_json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{dedup_song_entries, PendingSongEntry};
+
+    fn entry(comment_id: i32, time: &str, title: &str, author: &str) -> PendingSongEntry {
+        PendingSongEntry {
+            comment_id,
+            time: time.to_string(),
+            title: title.to_string(),
+            author: author.to_string(),
+        }
+    }
+
+    #[test]
+    fn removes_entries_with_empty_title_or_author() {
+        let entries = vec![
+            entry(1, "00:01:00", "", "Artist A"),
+            entry(1, "00:02:00", "Song B", ""),
+            entry(1, "00:03:00", "Song C", "Artist C"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "Song C");
+    }
+
+    #[test]
+    fn sorts_by_time_then_title_then_author() {
+        let entries = vec![
+            entry(1, "00:05:00", "Song B", "Artist B"),
+            entry(1, "00:01:00", "Song A", "Artist A"),
+            entry(1, "00:01:00", "Song A", "Artist Z"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|e| (e.time.as_str(), e.title.as_str(), e.author.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("00:01:00", "Song A", "Artist A"),
+                ("00:01:00", "Song A", "Artist Z"),
+                ("00:05:00", "Song B", "Artist B"),
+            ]
+        );
+    }
+
+    #[test]
+    fn dedups_by_normalized_title_and_author_keeping_earliest() {
+        let entries = vec![
+            entry(1, "00:10:00", "Song A", "Artist A"),
+            entry(2, "00:01:00", "  song a  ", "ARTIST A"),
+            entry(3, "00:05:00", "song\u{3000}a", "artist a"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].comment_id, 2);
+        assert_eq!(result[0].time, "00:01:00");
+    }
+
+    #[test]
+    fn keeps_distinct_title_author_combinations() {
+        let entries = vec![
+            entry(1, "00:01:00", "Song A", "Artist A"),
+            entry(1, "00:02:00", "Song A", "Artist B"),
+            entry(1, "00:03:00", "Song B", "Artist A"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(result.len(), 3);
+    }
 }
