@@ -272,4 +272,21 @@ impl ActiveModel {
         let model = active.update(db).await?;
         Ok(Some(model))
     }
+
+    /// Bulk-updates the published flag for videos by id.
+    ///
+    /// # Errors
+    /// Returns `DbErr` on database failure.
+    pub async fn bulk_update_published(
+        db: &DatabaseConnection,
+        ids: &[i32],
+        published: bool,
+    ) -> Result<u64, DbErr> {
+        let result = Entity::update_many()
+            .col_expr(videos::Column::Published, Expr::value(published))
+            .filter(videos::Column::Id.is_in(ids.iter().copied()))
+            .exec(db)
+            .await?;
+        Ok(result.rows_affected)
+    }
 }
