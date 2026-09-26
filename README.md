@@ -2,6 +2,8 @@
 
 Vtuber が歌枠で歌った曲のデータベースです。曲名や作者名・枠名などで検索が出来ます。
 
+設計書は別リポジトリ [vtuber-song-list-specs](https://github.com/septum128/vtuber-song-list-specs) を参照してください。
+
 ## クイックスタート
 
 ### 必要なもの
