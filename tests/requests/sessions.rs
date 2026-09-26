@@ -7,11 +7,12 @@ use super::session_prepare_data as pd;
 #[tokio::test]
 #[serial]
 async fn can_register() {
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
         let res = request
             .post("/api/user")
             .json(&serde_json::json!({
                 "name": "testuser",
+                "email": "testuser@example.com",
                 "password": "password123",
                 "password_confirmation": "password123",
             }))
@@ -25,6 +26,9 @@ async fn can_register() {
             body["user"]["kind"], 0,
             "New user should be kind=0 (member)"
         );
+
+        let deliveries = ctx.mailer.unwrap().deliveries();
+        assert_eq!(deliveries.count, 1, "Welcome email should be sent");
     })
     .await;
 }
@@ -35,13 +39,46 @@ async fn cannot_register_duplicate_name() {
     request::<App, _, _>(|request, _ctx| async move {
         let payload = serde_json::json!({
             "name": "duplicate",
+            "email": "duplicate1@example.com",
             "password": "password123",
             "password_confirmation": "password123",
         });
         request.post("/api/user").json(&payload).await;
+
+        let payload = serde_json::json!({
+            "name": "duplicate",
+            "email": "duplicate2@example.com",
+            "password": "password123",
+            "password_confirmation": "password123",
+        });
         let res = request.post("/api/user").json(&payload).await;
 
         assert_eq!(res.status_code(), 400, "Duplicate name should return 400");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn cannot_register_duplicate_email() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let payload = serde_json::json!({
+            "name": "emaildup1",
+            "email": "same@example.com",
+            "password": "password123",
+            "password_confirmation": "password123",
+        });
+        request.post("/api/user").json(&payload).await;
+
+        let payload = serde_json::json!({
+            "name": "emaildup2",
+            "email": "same@example.com",
+            "password": "password123",
+            "password_confirmation": "password123",
+        });
+        let res = request.post("/api/user").json(&payload).await;
+
+        assert_eq!(res.status_code(), 400, "Duplicate email should return 400");
     })
     .await;
 }
@@ -54,6 +91,7 @@ async fn cannot_register_password_mismatch() {
             .post("/api/user")
             .json(&serde_json::json!({
                 "name": "mismatch",
+                "email": "mismatch@example.com",
                 "password": "password123",
                 "password_confirmation": "different",
             }))

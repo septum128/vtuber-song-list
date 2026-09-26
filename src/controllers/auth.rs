@@ -68,6 +68,10 @@ async fn register(
 
     AuthMailer::send_welcome(&ctx, &user).await?;
 
+    if let Err(err) = AuthMailer::notify_admin_of_registration(&ctx, &user).await {
+        tracing::error!(error = ?err, "failed to send admin registration notification");
+    }
+
     format::json(())
 }
 

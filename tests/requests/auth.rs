@@ -56,6 +56,37 @@ async fn can_register() {
     .await;
 }
 
+#[tokio::test]
+#[serial]
+async fn can_register_notifies_admin_when_configured() {
+    configure_insta!();
+    std::env::set_var("ADMIN_NOTIFICATION_EMAIL", "admin@example.com");
+
+    request::<App, _, _>(|request, ctx| async move {
+        let payload = serde_json::json!({
+            "name": "loco",
+            "email": "test-admin-notify@loco.com",
+            "password": "12341234"
+        });
+
+        let response = request.post("/api/auth/register").json(&payload).await;
+        assert_eq!(
+            response.status_code(),
+            200,
+            "Register request should succeed"
+        );
+
+        let deliveries = ctx.mailer.unwrap().deliveries();
+        assert_eq!(
+            deliveries.count, 2,
+            "Welcome email + admin notification should be sent"
+        );
+    })
+    .await;
+
+    std::env::remove_var("ADMIN_NOTIFICATION_EMAIL");
+}
+
 #[rstest]
 #[case("login_with_valid_password", "12341234")]
 #[case("login_with_invalid_password", "invalid-password")]
