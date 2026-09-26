@@ -16,16 +16,21 @@ export type BulkCreateResult = {
 
 const KEY = "/api/admin/videos";
 
-function makeKey(channelId?: number, onlySongLives = false, page = 1) {
+function makeKey(channelId?: number, onlySongLives = false, page = 1, perPage = 30) {
   const token = getToken();
-  return token ? [KEY, token, channelId ?? null, onlySongLives, page] : null;
+  return token ? [KEY, token, channelId ?? null, onlySongLives, page, perPage] : null;
 }
 
-export function useAdminVideos(channelId?: number, onlySongLives = false, page = 1) {
+export function useAdminVideos(
+  channelId?: number,
+  onlySongLives = false,
+  page = 1,
+  perPage = 30
+) {
   return useSWR<VideoType[]>(
-    makeKey(channelId, onlySongLives, page),
+    makeKey(channelId, onlySongLives, page, perPage),
     ([url]: [string]) => {
-      const params = new URLSearchParams({ page: String(page), count: "30" });
+      const params = new URLSearchParams({ page: String(page), count: String(perPage) });
       if (channelId !== undefined) params.set("channel_id", String(channelId));
       if (onlySongLives) params.set("only_song_lives", "true");
       return apiFetch<VideoType[]>(`${url}?${params}`, { auth: true });

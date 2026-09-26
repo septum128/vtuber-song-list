@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAdminVideoListPerPage, setAdminVideoListPerPage } from "@/utils/storage";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -19,7 +20,8 @@ import {
 } from "@/utils/videoExport";
 import type { VideoType } from "@/resources/types";
 
-const PER_PAGE = 30;
+const PER_PAGE_OPTIONS = [30, 50, 100] as const;
+const DEFAULT_PER_PAGE = 30;
 
 const STATUS_SONG_ITEMS_CREATED = 20;
 
@@ -47,6 +49,7 @@ export function VideoList({ initialChannelId }: Props) {
   const [channelId, setChannelId] = useState<number | undefined>(initialChannelId);
   const [onlySongLives, setOnlySongLives] = useState(false);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [editTarget, setEditTarget] = useState<VideoType | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -56,8 +59,21 @@ export function VideoList({ initialChannelId }: Props) {
 
   const { addAlert } = useAlerts();
   const { data: channels } = useAdminChannels();
-  const { data: videos, isLoading } = useAdminVideos(channelId, onlySongLives, page);
+  const { data: videos, isLoading } = useAdminVideos(channelId, onlySongLives, page, perPage);
   const { fetchSetlist, bulkFetchSetlist, bulkPublish } = useAdminVideoActions();
+
+  useEffect(() => {
+    const stored = getAdminVideoListPerPage();
+    if (stored && (PER_PAGE_OPTIONS as readonly number[]).includes(stored)) {
+      setPerPage(stored);
+    }
+  }, []);
+
+  function handlePerPageChange(next: number) {
+    setPerPage(next);
+    setAdminVideoListPerPage(next);
+    setPage(1);
+  }
 
   const allSelected =
     !!videos && videos.length > 0 && videos.every((v) => selected.has(v.id));
@@ -204,6 +220,19 @@ export function VideoList({ initialChannelId }: Props) {
             歌枠のみ
           </label>
         </div>
+        <select
+          className="form-select form-select-sm"
+          style={{ maxWidth: "8rem" }}
+          value={perPage}
+          onChange={(e) => handlePerPageChange(Number(e.target.value))}
+          aria-label="表示件数"
+        >
+          {PER_PAGE_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}件
+            </option>
+          ))}
+        </select>
       </div>
 
       {someSelected && (
@@ -378,7 +407,7 @@ export function VideoList({ initialChannelId }: Props) {
           </div>
           <Pagination
             page={page}
-            perPage={PER_PAGE}
+            perPage={perPage}
             itemCount={videos.length}
             onPageChange={setPage}
           />
