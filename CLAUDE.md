@@ -70,3 +70,10 @@ When adding a new controller:
 This project uses a `staging` branch in addition to `main`: feature branches merge into `staging` first, and `staging` is periodically merged into `main` via PR. Both `main` and `staging` are protected — never implement directly on either.
 
 See the global CLAUDE.md for the issue/branch creation workflow and branch naming convention used before starting any task.
+
+## Pull Request Rules
+
+This project merges in two stages: feature branch → `staging` → `main`.
+
+1. When opening a PR for a feature/fix branch, always target `staging` first (`gh pr create --base staging ...`), never `main` directly.
+2. After that PR is merged into `staging`, open a separate PR from `staging` to `main` (`gh pr create --base main --head staging ...`) to promote the change.
