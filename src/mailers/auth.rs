@@ -1,42 +1,109 @@
 // auth mailer
-#![allow(non_upper_case_globals)]
-
-use loco_rs::prelude::*;
+use loco_rs::{environment::Environment, prelude::*};
 use serde_json::json;
 
+use super::cloudflare_worker::CloudflareMailerWorker;
 use crate::models::users;
 
-static welcome: Dir<'_> = include_dir!("src/mailers/auth/welcome");
-static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
-static magic_link: Dir<'_> = include_dir!("src/mailers/auth/magic_link");
-static admin_notification: Dir<'_> = include_dir!("src/mailers/auth/admin_notification");
+const WELCOME_SUBJECT: &str = include_str!("auth/welcome/subject.t");
+const WELCOME_HTML: &str = include_str!("auth/welcome/html.t");
+const WELCOME_TEXT: &str = include_str!("auth/welcome/text.t");
+
+const FORGOT_SUBJECT: &str = include_str!("auth/forgot/subject.t");
+const FORGOT_HTML: &str = include_str!("auth/forgot/html.t");
+const FORGOT_TEXT: &str = include_str!("auth/forgot/text.t");
+
+const MAGIC_LINK_SUBJECT: &str = include_str!("auth/magic_link/subject.t");
+const MAGIC_LINK_HTML: &str = include_str!("auth/magic_link/html.t");
+const MAGIC_LINK_TEXT: &str = include_str!("auth/magic_link/text.t");
+
+const ADMIN_NOTIFICATION_SUBJECT: &str = include_str!("auth/admin_notification/subject.t");
+const ADMIN_NOTIFICATION_HTML: &str = include_str!("auth/admin_notification/html.t");
+const ADMIN_NOTIFICATION_TEXT: &str = include_str!("auth/admin_notification/text.t");
+
+/// Renders a single Tera template string against `locals`.
+fn render(template: &str, locals: &serde_json::Value, autoescape: bool) -> Result<String> {
+    let context = tera::Context::from_serialize(locals).map_err(|e| Error::Any(Box::new(e)))?;
+    tera::Tera::one_off(template, &context, autoescape).map_err(|e| Error::Any(Box::new(e)))
+}
+
+fn render_email(
+    to: String,
+    subject_t: &str,
+    html_t: &str,
+    text_t: &str,
+    locals: &serde_json::Value,
+) -> Result<mailer::Email> {
+    Ok(mailer::Email {
+        to,
+        subject: render(subject_t, locals, false)?,
+        html: render(html_t, locals, true)?,
+        text: render(text_t, locals, false)?,
+        ..Default::default()
+    })
+}
 
 #[allow(clippy::module_name_repetitions)]
 pub struct AuthMailer {}
-impl Mailer for AuthMailer {}
+impl Mailer for AuthMailer {
+    fn opts() -> mailer::MailerOpts {
+        mailer::MailerOpts {
+            from: std::env::var("CLOUDFLARE_EMAIL_FROM")
+                .unwrap_or_else(|_| mailer::DEFAULT_FROM_SENDER.to_string()),
+            ..Default::default()
+        }
+    }
+}
 impl AuthMailer {
+    /// Sends an email through Cloudflare Email Sending when configured
+    /// (`CLOUDFLARE_API_TOKEN` set — the case for staging/production), otherwise
+    /// falls back to loco's built-in SMTP mailer (used in development/test).
+    ///
+    /// # Errors
+    ///
+    /// When email sending is failed
+    async fn dispatch(ctx: &AppContext, mut email: mailer::Email) -> Result<()> {
+        let opts = Self::opts();
+        email.from = Some(email.from.unwrap_or(opts.from));
+        email.reply_to = email.reply_to.or(opts.reply_to);
+
+        if std::env::var("CLOUDFLARE_API_TOKEN").is_ok() {
+            CloudflareMailerWorker::perform_later(ctx, email).await?;
+        } else {
+            if !matches!(
+                ctx.environment,
+                Environment::Development | Environment::Test
+            ) {
+                tracing::error!(
+                    "CLOUDFLARE_API_TOKEN not set outside dev/test — falling back to the SMTP \
+                     mailer, which is also unconfigured; email will NOT be sent"
+                );
+            }
+            Self::mail(ctx, &email).await?;
+        }
+
+        Ok(())
+    }
+
     /// Sending welcome email the the given user
     ///
     /// # Errors
     ///
     /// When email sending is failed
     pub async fn send_welcome(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        Self::mail_template(
-            ctx,
-            &welcome,
-            mailer::Args {
-                to: user.email.clone(),
-                locals: json!({
-                  "name": user.name,
-                  "verifyToken": user.email_verification_token,
-                  "domain": ctx.config.server.full_url()
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
+        let email = render_email(
+            user.email.clone(),
+            WELCOME_SUBJECT,
+            WELCOME_HTML,
+            WELCOME_TEXT,
+            &json!({
+              "name": user.name,
+              "verifyToken": user.email_verification_token,
+              "domain": ctx.config.server.full_url()
+            }),
+        )?;
 
-        Ok(())
+        Self::dispatch(ctx, email).await
     }
 
     /// Sending forgot password email
@@ -45,22 +112,19 @@ impl AuthMailer {
     ///
     /// When email sending is failed
     pub async fn forgot_password(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        Self::mail_template(
-            ctx,
-            &forgot,
-            mailer::Args {
-                to: user.email.clone(),
-                locals: json!({
-                  "name": user.name,
-                  "resetToken": user.reset_token,
-                  "domain": ctx.config.server.full_url()
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
+        let email = render_email(
+            user.email.clone(),
+            FORGOT_SUBJECT,
+            FORGOT_HTML,
+            FORGOT_TEXT,
+            &json!({
+              "name": user.name,
+              "resetToken": user.reset_token,
+              "domain": ctx.config.server.full_url()
+            }),
+        )?;
 
-        Ok(())
+        Self::dispatch(ctx, email).await
     }
 
     /// Sends a magic link authentication email to the user.
@@ -69,24 +133,24 @@ impl AuthMailer {
     ///
     /// When email sending is failed
     pub async fn send_magic_link(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        Self::mail_template(
-            ctx,
-            &magic_link,
-            mailer::Args {
-                to: user.email.clone(),
-                locals: json!({
-                  "name": user.name,
-                  "token": user.magic_link_token.clone().ok_or_else(|| Error::string(
-                            "the user model not contains magic link token",
-                    ))?,
-                  "host": ctx.config.server.full_url()
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
+        let token = user
+            .magic_link_token
+            .clone()
+            .ok_or_else(|| Error::string("the user model not contains magic link token"))?;
 
-        Ok(())
+        let email = render_email(
+            user.email.clone(),
+            MAGIC_LINK_SUBJECT,
+            MAGIC_LINK_HTML,
+            MAGIC_LINK_TEXT,
+            &json!({
+              "name": user.name,
+              "token": token,
+              "host": ctx.config.server.full_url()
+            }),
+        )?;
+
+        Self::dispatch(ctx, email).await
     }
 
     /// Notifies the admin (via `ADMIN_NOTIFICATION_EMAIL`) that a new user registered.
@@ -103,20 +167,35 @@ impl AuthMailer {
             return Ok(());
         };
 
-        Self::mail_template(
-            ctx,
-            &admin_notification,
-            mailer::Args {
-                to: admin_email,
-                locals: json!({
-                  "name": user.name,
-                  "email": user.email,
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
+        let email = render_email(
+            admin_email,
+            ADMIN_NOTIFICATION_SUBJECT,
+            ADMIN_NOTIFICATION_HTML,
+            ADMIN_NOTIFICATION_TEXT,
+            &json!({
+              "name": user.name,
+              "email": user.email,
+            }),
+        )?;
 
-        Ok(())
+        Self::dispatch(ctx, email).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render;
+    use serde_json::json;
+
+    #[test]
+    fn renders_locals_into_template() {
+        let rendered = render("Welcome {{name}}", &json!({"name": "loco"}), false).unwrap();
+        assert_eq!(rendered, "Welcome loco");
+    }
+
+    #[test]
+    fn escapes_html_when_autoescape_enabled() {
+        let rendered = render("<p>{{name}}</p>", &json!({"name": "<script>"}), true).unwrap();
+        assert_eq!(rendered, "<p>&lt;script&gt;</p>");
     }
 }

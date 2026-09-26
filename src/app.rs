@@ -16,6 +16,7 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     controllers, initializers,
+    mailers::cloudflare_worker::CloudflareMailerWorker,
     models::_entities::users,
     tasks,
     workers::{
@@ -71,6 +72,7 @@ impl Hooks for App {
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(SongItemsCreatorWorker::build(ctx)).await?;
         queue.register(SetlistFetchWorker::build(ctx)).await?;
+        queue.register(CloudflareMailerWorker::build(ctx)).await?;
         Ok(())
     }
 
