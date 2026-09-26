@@ -1,3 +1,4 @@
+// CI path-filter verification (#149): frontend-only change, safe to no-op.
 const TOKEN_KEY = "auth_token";
 const ADMIN_VIDEO_LIST_PER_PAGE_KEY = "admin_video_list_per_page";
 const ADMIN_VIDEO_LIST_ONLY_SONG_LIVES_KEY = "admin_video_list_only_song_lives";
