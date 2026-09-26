@@ -1,4 +1,4 @@
-;<html>
+<html>
 
 <body>
   <p>{{name}} 様</p>

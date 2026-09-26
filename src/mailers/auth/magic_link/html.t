@@ -1,4 +1,4 @@
-;<html>
+<html>
 <body>
 <p>Magic link example:</p>
 <a href="{{host}}/api/auth/magic-link/{{token}}">
