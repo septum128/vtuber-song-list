@@ -5379,6 +5379,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "tera",
  "tokio",
  "tracing",
  "tracing-subscriber",
