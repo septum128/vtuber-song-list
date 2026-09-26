@@ -80,6 +80,17 @@ struct BulkFetchSetlistBody {
     force: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+struct BulkPublishBody {
+    video_ids: Vec<i32>,
+    published: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct BulkPublishResult {
+    updated: u64,
+}
+
 #[derive(Debug, Serialize)]
 struct BulkCreateResult {
     succeeded: Vec<BulkCreateItem>,
@@ -393,6 +404,24 @@ async fn bulk_fetch_setlist(
     format::json(serde_json::json!({ "message": "セトリ取得ジョブをキューしました" }))
 }
 
+#[debug_handler]
+async fn bulk_publish(
+    auth: auth::JWT,
+    State(ctx): State<AppContext>,
+    Json(body): Json<BulkPublishBody>,
+) -> Result<Response> {
+    require_admin(&auth, &ctx).await?;
+
+    if body.video_ids.is_empty() {
+        return Err(loco_rs::Error::BadRequest("video_ids が空です".to_string()));
+    }
+
+    let updated =
+        ActiveModel::bulk_update_published(&ctx.db, &body.video_ids, body.published).await?;
+
+    format::json(BulkPublishResult { updated })
+}
+
 fn extract_video_id(input: &str) -> String {
     // https://www.youtube.com/watch?v=VIDEO_ID
     if let Some(pos) = input.find("v=") {
@@ -422,6 +451,7 @@ pub fn routes() -> Routes {
         .add("/", post(create))
         .add("/bulk", post(bulk_create))
         .add("/bulk_fetch_setlist", post(bulk_fetch_setlist))
+        .add("/bulk_publish", post(bulk_publish))
         .add("/{id}", patch(update))
         .add("/{id}/fetch_setlist", post(fetch_setlist))
 }

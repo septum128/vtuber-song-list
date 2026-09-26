@@ -57,7 +57,7 @@ export function VideoList({ initialChannelId }: Props) {
   const { addAlert } = useAlerts();
   const { data: channels } = useAdminChannels();
   const { data: videos, isLoading } = useAdminVideos(channelId, onlySongLives, page);
-  const { fetchSetlist, bulkFetchSetlist } = useAdminVideoActions();
+  const { fetchSetlist, bulkFetchSetlist, bulkPublish } = useAdminVideoActions();
 
   const allSelected =
     !!videos && videos.length > 0 && videos.every((v) => selected.has(v.id));
@@ -120,6 +120,22 @@ export function VideoList({ initialChannelId }: Props) {
         next.delete(videoId);
         return next;
       });
+    }
+  }
+
+  async function handleBulkPublish(published: boolean) {
+    if (selected.size === 0) return;
+    try {
+      await bulkPublish(Array.from(selected.keys()), published);
+      addAlert(
+        "success",
+        published
+          ? `${selected.size}件の動画を公開しました`
+          : `${selected.size}件の動画を非公開にしました`
+      );
+      clearSelection();
+    } catch (e) {
+      addAlert("danger", e instanceof Error ? e.message : "エラーが発生しました");
     }
   }
 
@@ -206,6 +222,20 @@ export function VideoList({ initialChannelId }: Props) {
             onClick={() => handleBulkFetchSetlist(true)}
           >
             強制再取得
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-success"
+            onClick={() => handleBulkPublish(true)}
+          >
+            一括公開
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => handleBulkPublish(false)}
+          >
+            一括非公開
           </button>
           <button
             type="button"
