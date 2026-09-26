@@ -9,6 +9,7 @@ use crate::models::users;
 static welcome: Dir<'_> = include_dir!("src/mailers/auth/welcome");
 static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
 static magic_link: Dir<'_> = include_dir!("src/mailers/auth/magic_link");
+static admin_notification: Dir<'_> = include_dir!("src/mailers/auth/admin_notification");
 
 #[allow(clippy::module_name_repetitions)]
 pub struct AuthMailer {}
@@ -79,6 +80,37 @@ impl AuthMailer {
                             "the user model not contains magic link token",
                     ))?,
                   "host": ctx.config.server.full_url()
+                }),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Notifies the admin (via `ADMIN_NOTIFICATION_EMAIL`) that a new user registered.
+    /// Does nothing if the env var is not set, since this is an optional feature.
+    ///
+    /// # Errors
+    ///
+    /// When email sending is failed
+    pub async fn notify_admin_of_registration(ctx: &AppContext, user: &users::Model) -> Result<()> {
+        let Some(admin_email) = std::env::var("ADMIN_NOTIFICATION_EMAIL")
+            .ok()
+            .filter(|s| !s.is_empty())
+        else {
+            return Ok(());
+        };
+
+        Self::mail_template(
+            ctx,
+            &admin_notification,
+            mailer::Args {
+                to: admin_email,
+                locals: json!({
+                  "name": user.name,
+                  "email": user.email,
                 }),
                 ..Default::default()
             },
