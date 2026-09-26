@@ -1,4 +1,10 @@
-import { getToken, setToken, removeToken } from "../storage";
+import {
+  getToken,
+  setToken,
+  removeToken,
+  getAdminVideoListPerPage,
+  setAdminVideoListPerPage,
+} from "../storage";
 
 describe("storage", () => {
   beforeEach(() => {
@@ -32,6 +38,24 @@ describe("storage", () => {
 
     it("does not throw when no token exists", () => {
       expect(() => removeToken()).not.toThrow();
+    });
+  });
+
+  describe("getAdminVideoListPerPage", () => {
+    it("returns null when nothing is stored", () => {
+      expect(getAdminVideoListPerPage()).toBeNull();
+    });
+
+    it("returns the stored value as a number", () => {
+      localStorage.setItem("admin_video_list_per_page", "50");
+      expect(getAdminVideoListPerPage()).toBe(50);
+    });
+  });
+
+  describe("setAdminVideoListPerPage", () => {
+    it("stores the value in localStorage", () => {
+      setAdminVideoListPerPage(100);
+      expect(localStorage.getItem("admin_video_list_per_page")).toBe("100");
     });
   });
 });
