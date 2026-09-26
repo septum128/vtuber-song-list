@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getAdminVideoListPerPage, setAdminVideoListPerPage } from "@/utils/storage";
+import {
+  getAdminVideoListPerPage,
+  setAdminVideoListPerPage,
+  getAdminVideoListOnlySongLives,
+  setAdminVideoListOnlySongLives,
+} from "@/utils/storage";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -67,11 +72,18 @@ export function VideoList({ initialChannelId }: Props) {
     if (stored && (PER_PAGE_OPTIONS as readonly number[]).includes(stored)) {
       setPerPage(stored);
     }
+    setOnlySongLives(getAdminVideoListOnlySongLives());
   }, []);
 
   function handlePerPageChange(next: number) {
     setPerPage(next);
     setAdminVideoListPerPage(next);
+    setPage(1);
+  }
+
+  function handleOnlySongLivesChange(next: boolean) {
+    setOnlySongLives(next);
+    setAdminVideoListOnlySongLives(next);
     setPage(1);
   }
 
@@ -211,10 +223,7 @@ export function VideoList({ initialChannelId }: Props) {
             className="form-check-input"
             id="only-song-lives"
             checked={onlySongLives}
-            onChange={(e) => {
-              setOnlySongLives(e.target.checked);
-              setPage(1);
-            }}
+            onChange={(e) => handleOnlySongLivesChange(e.target.checked)}
           />
           <label className="form-check-label small" htmlFor="only-song-lives">
             歌枠のみ
