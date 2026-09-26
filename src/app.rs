@@ -1,3 +1,4 @@
+// CI path-filter verification (#149): backend-only change, safe to no-op.
 use async_trait::async_trait;
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
