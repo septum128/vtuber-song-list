@@ -19,6 +19,7 @@ pub struct LoggedInUser {
 pub async fn register_and_login(request: &TestServer, name: &str, password: &str) -> LoggedInUser {
     let payload = serde_json::json!({
         "name": name,
+        "email": format!("{name}@local"),
         "password": password,
         "password_confirmation": password,
     });

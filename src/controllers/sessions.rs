@@ -1,3 +1,4 @@
+use crate::mailers::auth::AuthMailer;
 use crate::models::{_entities::users, users as users_model};
 use axum::http::StatusCode;
 use loco_rs::prelude::*;
@@ -6,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize)]
 struct RegisterBody {
     name: String,
+    email: String,
     password: String,
     password_confirmation: String,
 }
@@ -48,16 +50,35 @@ async fn register(
         ));
     }
 
-    // name を email 識別子として使用（ユニーク制約を兼ねる）
     let params = users_model::RegisterParams {
-        email: format!("{}@local", body.name),
+        email: body.email,
         password: body.password,
         name: body.name,
     };
 
     let user = users::Model::create_with_password(&ctx.db, &params)
         .await
-        .map_err(|_| Error::BadRequest("このユーザー名は既に使われています".into()))?;
+        .map_err(|err| match err {
+            ModelError::EntityAlreadyExists => {
+                Error::BadRequest("このメールアドレスは既に登録されています".into())
+            }
+            ModelError::Message(ref msg) if msg == "name already exists" => {
+                Error::BadRequest("このユーザー名は既に使われています".into())
+            }
+            _ => Error::BadRequest(
+                "入力内容をご確認ください（メールアドレスの形式などを確認してください）".into(),
+            ),
+        })?;
+
+    let user = user
+        .into_active_model()
+        .set_email_verification_sent(&ctx.db)
+        .await?;
+
+    AuthMailer::send_welcome(&ctx, &user).await?;
+    if let Err(err) = AuthMailer::notify_admin_of_registration(&ctx, &user).await {
+        tracing::error!(error = ?err, "failed to send admin registration notification");
+    }
 
     let jwt_secret = ctx.config.get_jwt_config()?;
     let token = user
@@ -90,8 +111,7 @@ async fn current(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Respo
 /// POST /api/session — ログイン
 #[debug_handler]
 async fn login(State(ctx): State<AppContext>, Json(body): Json<LoginBody>) -> Result<Response> {
-    let email = format!("{}@local", body.name);
-    let user = users::Model::find_by_email(&ctx.db, &email)
+    let user = users::Model::find_by_name(&ctx.db, &body.name)
         .await
         .map_err(|_| Error::BadRequest("ユーザー名またはパスワードが違います".into()))?;
 
