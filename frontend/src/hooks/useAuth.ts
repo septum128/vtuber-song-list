@@ -30,6 +30,7 @@ export function useAuth() {
 
   async function register(
     name: string,
+    email: string,
     password: string,
     passwordConfirmation: string
   ): Promise<void> {
@@ -38,7 +39,12 @@ export function useAuth() {
     }
     const res = await apiFetch<AuthResponse>("/api/user", {
       method: "POST",
-      body: JSON.stringify({ name, password, password_confirmation: passwordConfirmation }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        password_confirmation: passwordConfirmation,
+      }),
     });
     setToken(res.token);
     await mutate(USER_ENDPOINT, res.user, false);

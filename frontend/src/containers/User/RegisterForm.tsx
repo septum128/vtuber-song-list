@@ -7,6 +7,7 @@ import { useAlerts } from "@/context/AlertsProvider";
 
 type FormValues = {
   name: string;
+  email: string;
   password: string;
   password_confirmation: string;
 };
@@ -29,7 +30,12 @@ export function RegisterForm() {
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     try {
-      await registerUser(values.name, values.password, values.password_confirmation);
+      await registerUser(
+        values.name,
+        values.email,
+        values.password,
+        values.password_confirmation
+      );
       addAlert("success", "登録しました");
       await router.push("/");
     } catch (e) {
@@ -57,6 +63,25 @@ export function RegisterForm() {
         />
         {errors.name && (
           <div className="invalid-feedback">{errors.name.message}</div>
+        )}
+      </div>
+
+      <div className="mb-3">
+        <label htmlFor="reg-email" className="form-label">
+          メールアドレス
+        </label>
+        <input
+          id="reg-email"
+          type="email"
+          className={`form-control ${errors.email ? "is-invalid" : ""}`}
+          autoComplete="email"
+          {...register("email", {
+            required: "メールアドレスを入力してください",
+            maxLength: { value: 255, message: "メールアドレスは255文字以内で入力してください" },
+          })}
+        />
+        {errors.email && (
+          <div className="invalid-feedback">{errors.email.message}</div>
         )}
       </div>
 
