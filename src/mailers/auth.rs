@@ -21,6 +21,19 @@ const ADMIN_NOTIFICATION_SUBJECT: &str = include_str!("auth/admin_notification/s
 const ADMIN_NOTIFICATION_HTML: &str = include_str!("auth/admin_notification/html.t");
 const ADMIN_NOTIFICATION_TEXT: &str = include_str!("auth/admin_notification/text.t");
 
+/// The public URL users' browsers should hit for links embedded in emails
+/// (email verification, password reset, magic link).
+///
+/// `ctx.config.server.full_url()` (`host:port`) doesn't work behind Railway's
+/// edge, where the public domain terminates TLS on 443 and routes internally
+/// to a different container port — appending `:{port}` there produces a
+/// broken URL. `APP_HOST` is read directly here instead and should be set to
+/// the full public origin with no port (e.g.
+/// `https://vtuber-song-list-staging.up.railway.app`).
+fn public_app_url() -> String {
+    std::env::var("APP_HOST").unwrap_or_else(|_| "http://localhost:5150".to_string())
+}
+
 /// Renders a single Tera template string against `locals`.
 fn render(template: &str, locals: &serde_json::Value, autoescape: bool) -> Result<String> {
     let context = tera::Context::from_serialize(locals).map_err(|e| Error::Any(Box::new(e)))?;
@@ -99,7 +112,7 @@ impl AuthMailer {
             &json!({
               "name": user.name,
               "verifyToken": user.email_verification_token,
-              "domain": ctx.config.server.full_url()
+              "domain": public_app_url()
             }),
         )?;
 
@@ -120,7 +133,7 @@ impl AuthMailer {
             &json!({
               "name": user.name,
               "resetToken": user.reset_token,
-              "domain": ctx.config.server.full_url()
+              "domain": public_app_url()
             }),
         )?;
 
@@ -146,7 +159,7 @@ impl AuthMailer {
             &json!({
               "name": user.name,
               "token": token,
-              "host": ctx.config.server.full_url()
+              "host": public_app_url()
             }),
         )?;
 
