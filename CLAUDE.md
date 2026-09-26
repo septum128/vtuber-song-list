@@ -65,34 +65,8 @@ When adding a new controller:
 2. Export it from `src/controllers/mod.rs`
 3. Register its routes in `App::routes` in `app.rs`
 
-## Branch Naming Convention
+## Branch Protection
 
-Format: `<type>/<issue-id>-<short-description>`
+This project uses a `staging` branch in addition to `main`: feature branches merge into `staging` first, and `staging` is periodically merged into `main` via PR. Both `main` and `staging` are protected — never implement directly on either.
 
-| type | 用途 |
-|------|------|
-| `fix` | バグ修正 |
-| `feat` | 新機能 |
-| `hotfix` | 緊急修正 |
-| `refactor` | リファクタリング |
-| `chore` | 雑務・依存更新 |
-| `docs` | ドキュメント |
-
-Examples:
-- `fix/123-login-error`
-- `feat/101-user-profile`
-- `hotfix/789-payment-failure`
-
-Rules:
-- 英数字・ハイフンのみ（スペース・アンダースコア禁止）
-- 小文字統一
-- 短く端的に（3〜5単語程度）
-- Issue番号があれば含める
-
-## Starting a New Task
-
-Before writing any code, always:
-1. Create a GitHub issue: `gh issue create --title "..." --body "..."`
-2. Create a branch following the naming convention: `git checkout -b <type>/<issue-id>-<short-description>`
-
-**Never implement directly on `main` or `staging`.** Always create a dedicated branch first, even for small fixes.
+See the global CLAUDE.md for the issue/branch creation workflow and branch naming convention used before starting any task.
