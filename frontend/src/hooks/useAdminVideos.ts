@@ -94,5 +94,14 @@ export function useAdminVideoActions() {
     });
   }
 
-  return { create, update, bulkCreate, fetchSetlist, bulkFetchSetlist };
+  async function bulkPublish(videoIds: number[], published: boolean): Promise<void> {
+    await apiFetch<{ updated: number }>(`${KEY}/bulk_publish`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ video_ids: videoIds, published }),
+    });
+    await mutate((key) => Array.isArray(key) && key[0] === KEY);
+  }
+
+  return { create, update, bulkCreate, fetchSetlist, bulkFetchSetlist, bulkPublish };
 }
