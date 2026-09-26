@@ -29,23 +29,32 @@ export default function Home() {
       <p>
         ユーザ登録（ID/パスワード認証）をしていただくと、セトリの修正提案が可能ですので、そちらからセトリの修正申請をお願いいたします。
       </p>
-      <p>
-        お問い合わせは
-        <a href="https://twitter.com/interceptor128" target="_blank">
-          Twitter
-        </a>
-        か<a href="mailto:contact@vtuber-song.com">メール</a>へ！
-      </p>
-      <p>
-        不具合報告はGitHubの
-        <a
-          href="https://github.com/septum128/vtuber-song-list/issues"
-          target="_blank"
-        >
-          Issue
-        </a>
-        へ投稿をお願いいたします。
-      </p>
+      <p>ご連絡は以下のいずれかからお願いいたします。</p>
+      <ul>
+        <li>
+          お問い合わせ：
+          <a href="https://twitter.com/interceptor128" target="_blank">
+            Twitter
+          </a>
+          （@interceptor128 にリプライ ※DM不可）または
+          <a href="mailto:contact@vtuber-song.com">メール</a>、または
+          <a
+            href="https://marshmallow-qa.com/interceptor128?t=OLl4Y0&utm_medium=url_text&utm_source=promotion"
+            target="_blank"
+          >
+            マシュマロ
+          </a>
+        </li>
+        <li>
+          不具合報告：GitHubの
+          <a
+            href="https://github.com/septum128/vtuber-song-list/issues"
+            target="_blank"
+          >
+            Issue
+          </a>
+        </li>
+      </ul>
     </DefaultLayout>
   );
 }
