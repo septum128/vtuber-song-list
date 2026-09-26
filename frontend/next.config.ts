@@ -32,6 +32,12 @@ const nextConfig: NextConfig = {
     quietDeps: true,
   },
   async headers() {
+    // next dev's React Refresh/HMR runtime uses eval(), which this CSP's
+    // script-src doesn't allow, causing a blank page in development.
+    // The CSP only matters for the deployed production build.
+    if (process.env.NODE_ENV !== "production") {
+      return [];
+    }
     return [
       {
         source: "/(.*)",
