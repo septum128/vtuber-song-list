@@ -14,25 +14,35 @@ export type BulkCreateResult = {
   failed: BulkCreateItem[];
 };
 
+export type AdminVideoSort = "published_at" | "id";
+
 const KEY = "/api/admin/videos";
 
-function makeKey(channelId?: number, onlySongLives = false, page = 1, perPage = 30) {
+function makeKey(
+  channelId?: number,
+  onlySongLives = false,
+  page = 1,
+  perPage = 30,
+  sort: AdminVideoSort = "published_at"
+) {
   const token = getToken();
-  return token ? [KEY, token, channelId ?? null, onlySongLives, page, perPage] : null;
+  return token ? [KEY, token, channelId ?? null, onlySongLives, page, perPage, sort] : null;
 }
 
 export function useAdminVideos(
   channelId?: number,
   onlySongLives = false,
   page = 1,
-  perPage = 30
+  perPage = 30,
+  sort: AdminVideoSort = "published_at"
 ) {
   return useSWR<VideoType[]>(
-    makeKey(channelId, onlySongLives, page, perPage),
+    makeKey(channelId, onlySongLives, page, perPage, sort),
     ([url]: [string]) => {
       const params = new URLSearchParams({ page: String(page), count: String(perPage) });
       if (channelId !== undefined) params.set("channel_id", String(channelId));
       if (onlySongLives) params.set("only_song_lives", "true");
+      if (sort !== "published_at") params.set("sort", sort);
       return apiFetch<VideoType[]>(`${url}?${params}`, { auth: true });
     }
   );

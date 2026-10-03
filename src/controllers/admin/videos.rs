@@ -45,6 +45,7 @@ impl From<videos::Model> for VideoResponse {
 struct ListQuery {
     channel_id: Option<i64>,
     only_song_lives: Option<bool>,
+    sort: Option<String>,
     page: Option<u64>,
     count: Option<u64>,
 }
@@ -116,6 +117,7 @@ async fn list(
         &VideosAdminParams {
             channel_id: q.channel_id,
             only_song_lives: q.only_song_lives,
+            sort: q.sort,
             page: q.page,
             count: q.count,
         },

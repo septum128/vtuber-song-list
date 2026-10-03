@@ -32,6 +32,9 @@ pub struct VideosParams {
 pub struct VideosAdminParams {
     pub channel_id: Option<i64>,
     pub only_song_lives: Option<bool>,
+    /// Sort key: `"id"` sorts by id (newest registration first); anything else
+    /// (default) sorts by `published_at`.
+    pub sort: Option<String>,
     pub page: Option<u64>,
     pub count: Option<u64>,
 }
@@ -167,8 +170,12 @@ impl Model {
             });
             select = select.filter(cond);
         }
+        let order_column = match params.sort.as_deref() {
+            Some("id") => videos::Column::Id,
+            _ => videos::Column::PublishedAt,
+        };
         select
-            .order_by_desc(videos::Column::PublishedAt)
+            .order_by_desc(order_column)
             .limit(params.limit())
             .offset(params.offset())
             .all(db)
