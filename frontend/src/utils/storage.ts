@@ -1,6 +1,7 @@
 const TOKEN_KEY = "auth_token";
 const ADMIN_VIDEO_LIST_PER_PAGE_KEY = "admin_video_list_per_page";
 const ADMIN_VIDEO_LIST_ONLY_SONG_LIVES_KEY = "admin_video_list_only_song_lives";
+const ADMIN_VIDEO_LIST_SORT_KEY = "admin_video_list_sort";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -32,4 +33,13 @@ export function getAdminVideoListOnlySongLives(): boolean {
 
 export function setAdminVideoListOnlySongLives(value: boolean): void {
   localStorage.setItem(ADMIN_VIDEO_LIST_ONLY_SONG_LIVES_KEY, String(value));
+}
+
+export function getAdminVideoListSort(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ADMIN_VIDEO_LIST_SORT_KEY);
+}
+
+export function setAdminVideoListSort(value: string): void {
+  localStorage.setItem(ADMIN_VIDEO_LIST_SORT_KEY, value);
 }

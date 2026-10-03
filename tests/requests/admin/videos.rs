@@ -133,3 +133,51 @@ async fn bulk_publish_rejects_empty_ids() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+async fn admin_can_sort_videos_by_id() {
+    request::<App, _, _>(|request, ctx| async move {
+        let channel = pd::create_channel(&ctx).await;
+        let newer = create_video_with(&ctx, i64::from(channel.id), "sort_newer", false).await;
+        // Registered later but streamed earlier (e.g. an archive fetched via API).
+        let older = create_video_with(&ctx, i64::from(channel.id), "sort_older", false).await;
+        let mut active: videos_entity::ActiveModel = older.clone().into();
+        active.published_at =
+            ActiveValue::set((chrono::Utc::now() - chrono::Duration::days(30)).fixed_offset());
+        active.update(&ctx.db).await.unwrap();
+
+        pd::register_and_login(&request, "sort_admin", "password123").await;
+        pd::make_admin(&ctx, "sort_admin").await;
+        let token = pd::login(&request, "sort_admin", "password123").await;
+
+        let ids = |body: &str| -> Vec<i64> {
+            let v: serde_json::Value = serde_json::from_str(body).unwrap();
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x["id"].as_i64().unwrap())
+                .collect()
+        };
+
+        let (key, val) = pd::auth_header(&token);
+        let res = request.get("/api/admin/videos").add_header(key, val).await;
+        assert_eq!(res.status_code(), 200);
+        assert_eq!(
+            ids(&res.text()),
+            vec![i64::from(newer.id), i64::from(older.id)]
+        );
+
+        let (key, val) = pd::auth_header(&token);
+        let res = request
+            .get("/api/admin/videos?sort=id")
+            .add_header(key, val)
+            .await;
+        assert_eq!(res.status_code(), 200);
+        assert_eq!(
+            ids(&res.text()),
+            vec![i64::from(older.id), i64::from(newer.id)]
+        );
+    })
+    .await;
+}
