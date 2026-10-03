@@ -4,11 +4,17 @@ import {
   setAdminVideoListPerPage,
   getAdminVideoListOnlySongLives,
   setAdminVideoListOnlySongLives,
+  getAdminVideoListSort,
+  setAdminVideoListSort,
 } from "@/utils/storage";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { useAdminVideos, useAdminVideoActions } from "@/hooks/useAdminVideos";
+import {
+  useAdminVideos,
+  useAdminVideoActions,
+  type AdminVideoSort,
+} from "@/hooks/useAdminVideos";
 import { useAdminChannels } from "@/hooks/useAdminChannels";
 import { useAlerts } from "@/context/AlertsProvider";
 import { Loading } from "@/components/Common/Loading";
@@ -27,6 +33,11 @@ import type { VideoType } from "@/resources/types";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 const DEFAULT_PER_PAGE = 30;
+
+const SORT_OPTIONS: { value: AdminVideoSort; label: string }[] = [
+  { value: "published_at", label: "配信日順" },
+  { value: "id", label: "ID順" },
+];
 
 const STATUS_SONG_ITEMS_CREATED = 20;
 
@@ -55,6 +66,7 @@ export function VideoList({ initialChannelId }: Props) {
   const [onlySongLives, setOnlySongLives] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
+  const [sort, setSort] = useState<AdminVideoSort>("published_at");
   const [editTarget, setEditTarget] = useState<VideoType | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -64,7 +76,13 @@ export function VideoList({ initialChannelId }: Props) {
 
   const { addAlert } = useAlerts();
   const { data: channels } = useAdminChannels();
-  const { data: videos, isLoading } = useAdminVideos(channelId, onlySongLives, page, perPage);
+  const { data: videos, isLoading } = useAdminVideos(
+    channelId,
+    onlySongLives,
+    page,
+    perPage,
+    sort
+  );
   const { fetchSetlist, bulkFetchSetlist, bulkPublish } = useAdminVideoActions();
 
   useEffect(() => {
@@ -73,11 +91,21 @@ export function VideoList({ initialChannelId }: Props) {
       setPerPage(stored);
     }
     setOnlySongLives(getAdminVideoListOnlySongLives());
+    const storedSort = getAdminVideoListSort();
+    if (SORT_OPTIONS.some((opt) => opt.value === storedSort)) {
+      setSort(storedSort as AdminVideoSort);
+    }
   }, []);
 
   function handlePerPageChange(next: number) {
     setPerPage(next);
     setAdminVideoListPerPage(next);
+    setPage(1);
+  }
+
+  function handleSortChange(next: AdminVideoSort) {
+    setSort(next);
+    setAdminVideoListSort(next);
     setPage(1);
   }
 
@@ -229,6 +257,19 @@ export function VideoList({ initialChannelId }: Props) {
             歌枠のみ
           </label>
         </div>
+        <select
+          className="form-select form-select-sm"
+          style={{ maxWidth: "8rem" }}
+          value={sort}
+          onChange={(e) => handleSortChange(e.target.value as AdminVideoSort)}
+          aria-label="並び順"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <select
           className="form-select form-select-sm"
           style={{ maxWidth: "8rem" }}
