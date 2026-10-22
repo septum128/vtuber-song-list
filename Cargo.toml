@@ -40,7 +40,7 @@ fluent-templates = { version = "0.13", features = ["tera"] }
 unic-langid = { version = "0.9" }
 # /view engine
 axum-extra = { version = "0.10", features = ["form"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json", "form"] }
 tera = { version = "1.20.1" }
 
 [[bin]]
