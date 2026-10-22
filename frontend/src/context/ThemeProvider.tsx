@@ -24,6 +24,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     const initial = stored === "dark" || stored === "light" ? stored : DEFAULT_THEME;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration 不一致を避けるため、localStorage はマウント後に読む
     setTheme(initial);
     document.documentElement.setAttribute("data-bs-theme", initial);
   }, []);

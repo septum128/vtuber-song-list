@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,11 +21,11 @@ export function RegisterForm() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>();
 
-  const password = watch("password");
+  const password = useWatch({ control, name: "password" });
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
