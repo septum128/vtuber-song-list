@@ -85,6 +85,8 @@ export function VideoList({ initialChannelId }: Props) {
   );
   const { fetchSetlist, bulkFetchSetlist, bulkPublish } = useAdminVideoActions();
 
+  // hydration 不一致を避けるため、localStorage に保存した表示設定はマウント後に読む
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = getAdminVideoListPerPage();
     if (stored && (PER_PAGE_OPTIONS as readonly number[]).includes(stored)) {
@@ -96,6 +98,7 @@ export function VideoList({ initialChannelId }: Props) {
       setSort(storedSort as AdminVideoSort);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handlePerPageChange(next: number) {
     setPerPage(next);
