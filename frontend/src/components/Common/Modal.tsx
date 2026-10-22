@@ -12,6 +12,7 @@ export function Modal({ show, onClose, title, children }: Props) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR では document.body が無いため、マウント後にポータルを有効化する
     setMounted(true);
   }, []);
 
