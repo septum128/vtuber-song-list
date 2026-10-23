@@ -4,7 +4,6 @@ use sea_orm::{
 };
 
 pub use super::_entities::song_diffs::{self, ActiveModel, Entity, Model};
-use super::song_items::latest_diff_id;
 
 // status values
 pub const STATUS_PENDING: i32 = 0;
@@ -97,7 +96,7 @@ impl Model {
             .await?;
         if let Some(item) = song_item {
             let mut item_active: song_items::ActiveModel = item.into();
-            item_active.latest_diff_id = ActiveValue::set(latest_diff_id(diff.id)?);
+            item_active.latest_diff_id = ActiveValue::set(Some(diff.id));
             item_active.update(db).await?;
         }
 
@@ -161,7 +160,7 @@ impl ActiveModel {
         let song_item = song_items::Entity::find_by_id(song_item_id).one(db).await?;
         if let Some(item) = song_item {
             let mut item_active: song_items::ActiveModel = item.into();
-            item_active.latest_diff_id = ActiveValue::set(latest_diff_id(diff.id)?);
+            item_active.latest_diff_id = ActiveValue::set(Some(diff.id));
             item_active.update(db).await?;
         }
 
@@ -205,7 +204,7 @@ impl ActiveModel {
                 .await?;
             if let Some(item) = song_item {
                 let mut active: song_items::ActiveModel = item.into();
-                active.latest_diff_id = ActiveValue::set(latest_diff_id(diff.id)?);
+                active.latest_diff_id = ActiveValue::set(Some(diff.id));
                 active.update(db).await?;
             }
         }

@@ -7,7 +7,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub video_id: i64,
-    pub latest_diff_id: Option<i32>,
+    pub latest_diff_id: Option<i64>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

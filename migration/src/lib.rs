@@ -12,6 +12,7 @@ mod m20260319_000007_create_favorites;
 
 mod m20260328_022428_add_icon_url_to_channels;
 mod m20260926_134141_add_unique_index_to_users_name;
+mod m20261023_094647_widen_primary_keys_to_bigint;
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -28,6 +29,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260319_000007_create_favorites::Migration),
             Box::new(m20260328_022428_add_icon_url_to_channels::Migration),
             Box::new(m20260926_134141_add_unique_index_to_users_name::Migration),
+            Box::new(m20261023_094647_widen_primary_keys_to_bigint::Migration),
             // inject-above (do not remove this comment)
         ]
     }

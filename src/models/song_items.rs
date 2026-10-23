@@ -10,16 +10,6 @@ pub use super::_entities::song_items::{self, ActiveModel, Entity, Model};
 
 pub const DEFAULT_PAGE_SIZE: u64 = 20;
 
-/// Converts a `song_diffs.id` (BIGINT) into a `song_items.latest_diff_id` (INTEGER) value.
-///
-/// # Errors
-/// Returns `DbErr` if the id does not fit in an `i32`.
-pub fn latest_diff_id(diff_id: i64) -> Result<Option<i32>, DbErr> {
-    i32::try_from(diff_id)
-        .map(Some)
-        .map_err(|e| DbErr::Custom(format!("diff id {diff_id} out of range: {e}")))
-}
-
 pub struct SongItemsParams {
     pub channel_id: Option<i64>,
     pub video_id: Option<i64>,
@@ -57,7 +47,7 @@ impl SongItemsParams {
 pub struct SongItemRow {
     pub id: i64,
     pub video_id: i64,
-    pub latest_diff_id: Option<i32>,
+    pub latest_diff_id: Option<i64>,
     // video fields
     pub v_id: i64,
     pub v_video_id: String,
@@ -319,7 +309,7 @@ impl ActiveModel {
 
         // Update latest_diff_id.
         let mut active: Self = item.into();
-        active.latest_diff_id = ActiveValue::set(latest_diff_id(diff.id)?);
+        active.latest_diff_id = ActiveValue::set(Some(diff.id));
         let model = active.update(db).await?;
         Ok(model)
     }
