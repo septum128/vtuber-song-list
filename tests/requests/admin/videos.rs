@@ -34,8 +34,8 @@ async fn create_video_with(
 async fn admin_can_bulk_publish_videos() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let v1 = create_video_with(&ctx, i64::from(channel.id), "bulk_pub_1", false).await;
-        let v2 = create_video_with(&ctx, i64::from(channel.id), "bulk_pub_2", false).await;
+        let v1 = create_video_with(&ctx, channel.id, "bulk_pub_1", false).await;
+        let v2 = create_video_with(&ctx, channel.id, "bulk_pub_2", false).await;
 
         let admin = pd::register_and_login(&request, "bulk_publish_admin", "password123").await;
         pd::make_admin(&ctx, "bulk_publish_admin").await;
@@ -62,8 +62,8 @@ async fn admin_can_bulk_publish_videos() {
 async fn admin_can_bulk_unpublish_videos() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let v1 = create_video_with(&ctx, i64::from(channel.id), "bulk_unpub_1", true).await;
-        let v2 = create_video_with(&ctx, i64::from(channel.id), "bulk_unpub_2", true).await;
+        let v1 = create_video_with(&ctx, channel.id, "bulk_unpub_1", true).await;
+        let v2 = create_video_with(&ctx, channel.id, "bulk_unpub_2", true).await;
 
         let admin = pd::register_and_login(&request, "bulk_unpublish_admin", "password123").await;
         pd::make_admin(&ctx, "bulk_unpublish_admin").await;
@@ -90,7 +90,7 @@ async fn admin_can_bulk_unpublish_videos() {
 async fn member_cannot_bulk_publish_videos() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let v1 = create_video_with(&ctx, i64::from(channel.id), "bulk_member_1", false).await;
+        let v1 = create_video_with(&ctx, channel.id, "bulk_member_1", false).await;
 
         let member =
             pd::register_and_login(&request, "not_admin_bulk_publish", "password123").await;
@@ -139,9 +139,9 @@ async fn bulk_publish_rejects_empty_ids() {
 async fn admin_can_sort_videos_by_id() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let newer = create_video_with(&ctx, i64::from(channel.id), "sort_newer", false).await;
+        let newer = create_video_with(&ctx, channel.id, "sort_newer", false).await;
         // Registered later but streamed earlier (e.g. an archive fetched via API).
-        let older = create_video_with(&ctx, i64::from(channel.id), "sort_older", false).await;
+        let older = create_video_with(&ctx, channel.id, "sort_older", false).await;
         let mut active: videos_entity::ActiveModel = older.clone().into();
         active.published_at =
             ActiveValue::set((chrono::Utc::now() - chrono::Duration::days(30)).fixed_offset());
@@ -163,10 +163,7 @@ async fn admin_can_sort_videos_by_id() {
         let (key, val) = pd::auth_header(&token);
         let res = request.get("/api/admin/videos").add_header(key, val).await;
         assert_eq!(res.status_code(), 200);
-        assert_eq!(
-            ids(&res.text()),
-            vec![i64::from(newer.id), i64::from(older.id)]
-        );
+        assert_eq!(ids(&res.text()), vec![newer.id, older.id]);
 
         let (key, val) = pd::auth_header(&token);
         let res = request
@@ -174,10 +171,7 @@ async fn admin_can_sort_videos_by_id() {
             .add_header(key, val)
             .await;
         assert_eq!(res.status_code(), 200);
-        assert_eq!(
-            ids(&res.text()),
-            vec![i64::from(older.id), i64::from(newer.id)]
-        );
+        assert_eq!(ids(&res.text()), vec![older.id, newer.id]);
     })
     .await;
 }

@@ -10,7 +10,7 @@ default-run = "vtuber_song_list-cli"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
-loco-rs = { version = "0.16" }
+loco-rs = { version = "1.2" }
 
 [dependencies]
 loco-rs = { workspace = true  }
@@ -25,7 +25,7 @@ tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.11" }
 migration = { path = "migration" }
-sea-orm = { version = "1.1", features = [
+sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
   "sqlx-postgres",
   "runtime-tokio-rustls",
@@ -36,7 +36,7 @@ validator = { version = "0.20" }
 uuid = { version = "1.6", features = ["v4"] }
 include_dir = { version = "0.7" }
 # view engine i18n
-fluent-templates = { version = "0.13", features = ["tera"] }
+fluent-templates = { version = "0.15", features = ["tera"] }
 unic-langid = { version = "0.9" }
 # /view engine
 axum-extra = { version = "0.10", features = ["form"] }

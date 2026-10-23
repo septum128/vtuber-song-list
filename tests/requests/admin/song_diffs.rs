@@ -13,8 +13,8 @@ async fn setup_pending_diff(
     i64, // diff id
 ) {
     let channel = pd::create_channel(ctx).await;
-    let video = pd::create_video(ctx, i64::from(channel.id)).await;
-    let item = pd::create_song_item(ctx, i64::from(video.id)).await;
+    let video = pd::create_video(ctx, channel.id).await;
+    let item = pd::create_song_item(ctx, video.id).await;
 
     // Submit a pending diff as a regular member
     let member = pd::register_and_login(request, "pending_submitter", "password123").await;

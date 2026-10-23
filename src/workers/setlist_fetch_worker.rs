@@ -23,7 +23,7 @@ pub struct SetlistFetchWorker {
 
 #[derive(Deserialize, Debug, Serialize)]
 pub struct SetlistFetchWorkerArgs {
-    pub video_ids: Vec<i32>,
+    pub video_ids: Vec<i64>,
     pub force: bool,
 }
 
@@ -118,7 +118,7 @@ async fn reset_video_setlist(
     db: &sea_orm::DatabaseConnection,
     video: &videos_entity::Model,
 ) -> Result<()> {
-    let video_id = i64::from(video.id);
+    let video_id = video.id;
 
     let items = song_items_entity::Entity::find()
         .filter(song_items_entity::Column::VideoId.eq(video_id))
@@ -127,7 +127,7 @@ async fn reset_video_setlist(
         .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
     if !items.is_empty() {
-        let item_ids: Vec<i64> = items.iter().map(|i| i64::from(i.id)).collect();
+        let item_ids: Vec<i64> = items.iter().map(|i| i.id).collect();
 
         // Null latest_diff_id to avoid FK constraint violation when deleting song_diffs
         for item in items {

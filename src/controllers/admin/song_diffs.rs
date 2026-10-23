@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct SongDiffResponse {
-    id: i32,
+    id: i64,
     song_item_id: i64,
     made_by_id: Option<i64>,
     time: Option<String>,
@@ -65,7 +65,7 @@ async fn list(
 async fn approve(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
     song_diffs::Model::approve(&ctx.db, id)
@@ -77,7 +77,7 @@ async fn approve(
 async fn reject(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
     song_diffs::Model::reject(&ctx.db, id)
