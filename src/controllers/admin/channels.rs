@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct ChannelResponse {
-    id: i32,
+    id: i64,
     channel_id: String,
     name: Option<String>,
     custom_name: String,
@@ -142,7 +142,7 @@ async fn create(
 async fn update(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(body): Json<UpdateBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
@@ -202,7 +202,7 @@ async fn update(
 async fn delete(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
     let deleted = channels::Model::delete_by_id(&ctx.db, id).await?;

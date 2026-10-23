@@ -18,7 +18,7 @@ struct CreateSongDiffBody {
 
 #[derive(Serialize)]
 struct SongDiffResponse {
-    id: i32,
+    id: i64,
     song_item_id: i64,
     made_by_id: Option<i64>,
     time: Option<String>,

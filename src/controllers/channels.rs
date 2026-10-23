@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 struct ChannelResponse {
-    id: i32,
+    id: i64,
     channel_id: String,
     name: Option<String>,
     custom_name: String,
@@ -37,7 +37,7 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 #[debug_handler]
-async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i32>) -> Result<Response> {
+async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i64>) -> Result<Response> {
     channels::Model::find_by_id(&ctx.db, id)
         .await?
         .map_or_else(not_found, |channel| {

@@ -66,7 +66,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -74,7 +74,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn delete_by_id(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    pub async fn delete_by_id(db: &DatabaseConnection, id: i64) -> Result<bool, DbErr> {
         let result = Entity::delete_by_id(id).exec(db).await?;
         Ok(result.rows_affected > 0)
     }
@@ -108,7 +108,7 @@ impl ActiveModel {
     /// Returns `DbErr` on database failure.
     pub async fn update_from_params(
         db: &DatabaseConnection,
-        id: i32,
+        id: i64,
         params: UpdateChannelParams,
     ) -> Result<Option<Model>, DbErr> {
         let Some(channel) = Entity::find_by_id(id).one(db).await? else {

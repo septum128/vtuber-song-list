@@ -20,7 +20,7 @@ struct LoginBody {
 
 #[derive(Serialize)]
 struct UserResponse {
-    id: i32,
+    id: i64,
     name: String,
     kind: i32,
 }

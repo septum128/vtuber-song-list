@@ -39,7 +39,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn mark_completed(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
+    pub async fn mark_completed(db: &DatabaseConnection, id: i64) -> Result<(), DbErr> {
         let Some(comment) = Entity::find_by_id(id).one(db).await? else {
             return Ok(());
         };
