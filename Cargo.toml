@@ -40,7 +40,7 @@ fluent-templates = { version = "0.13", features = ["tera"] }
 unic-langid = { version = "0.9" }
 # /view engine
 axum-extra = { version = "0.10", features = ["form"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json", "form"] }
 tera = { version = "1.20.1" }
 
 [[bin]]
@@ -50,6 +50,6 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
-serial_test = { version = "3.1.1" }
+serial_test = { version = "4.0.1" }
 rstest = { version = "0.25" }
 insta = { version = "1.34", features = ["redactions", "yaml", "filters"] }
