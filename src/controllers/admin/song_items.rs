@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 struct SongItemResponse {
     id: i64,
     video_id: i64,
-    latest_diff_id: Option<i32>,
+    latest_diff_id: Option<i64>,
     video: VideoInfo,
     diff: DiffInfo,
 }
