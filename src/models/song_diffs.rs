@@ -71,7 +71,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -79,7 +79,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn approve(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn approve(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         use super::_entities::song_items;
 
         let Some(diff) = Entity::find_by_id(id).one(db).await? else {
@@ -91,8 +91,7 @@ impl Model {
         let diff = active.update(db).await?;
 
         // Update song_item.latest_diff_id to point to this diff.
-        #[allow(clippy::cast_possible_truncation)]
-        let song_item = song_items::Entity::find_by_id(diff.song_item_id as i32)
+        let song_item = song_items::Entity::find_by_id(diff.song_item_id)
             .one(db)
             .await?;
         if let Some(item) = song_item {
@@ -108,7 +107,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn reject(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn reject(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         let Some(diff) = Entity::find_by_id(id).one(db).await? else {
             return Ok(None);
         };
@@ -122,7 +121,7 @@ impl Model {
 
 pub struct CreateSongDiffParams {
     pub song_item_id: i64,
-    pub made_by_id: i32,
+    pub made_by_id: i64,
     pub time: Option<String>,
     pub title: Option<String>,
     pub author: Option<String>,
@@ -158,10 +157,7 @@ impl ActiveModel {
         .insert(db)
         .await?;
 
-        #[allow(clippy::cast_possible_truncation)]
-        let song_item = song_items::Entity::find_by_id(song_item_id as i32)
-            .one(db)
-            .await?;
+        let song_item = song_items::Entity::find_by_id(song_item_id).one(db).await?;
         if let Some(item) = song_item {
             let mut item_active: song_items::ActiveModel = item.into();
             item_active.latest_diff_id = ActiveValue::set(Some(diff.id));
@@ -190,7 +186,7 @@ impl ActiveModel {
 
         let diff = Self {
             song_item_id: ActiveValue::set(params.song_item_id),
-            made_by_id: ActiveValue::set(Some(i64::from(params.made_by_id))),
+            made_by_id: ActiveValue::set(Some(params.made_by_id)),
             time: ActiveValue::set(params.time),
             title: ActiveValue::set(params.title),
             author: ActiveValue::set(params.author),
@@ -203,8 +199,7 @@ impl ActiveModel {
 
         // When admin approves immediately, update latest_diff_id on the song_item.
         if params.is_admin {
-            #[allow(clippy::cast_possible_truncation)]
-            let song_item = song_items::Entity::find_by_id(params.song_item_id as i32)
+            let song_item = song_items::Entity::find_by_id(params.song_item_id)
                 .one(db)
                 .await?;
             if let Some(item) = song_item {

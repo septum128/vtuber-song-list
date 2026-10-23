@@ -41,7 +41,7 @@ const SONG_LIVE_KEYWORDS: &[&str] = &[
 
 #[derive(Debug, FromQueryResult)]
 struct DiffWithTitle {
-    id: i32,
+    id: i64,
     title: Option<String>,
     #[allow(dead_code)]
     song_item_id: i64,
@@ -56,7 +56,7 @@ fn is_song_live(title: &str) -> bool {
 
 /// A setlist entry extracted from a comment, still tied to its source comment.
 struct PendingSongEntry {
-    comment_id: i32,
+    comment_id: i64,
     time: String,
     title: String,
     author: String,
@@ -300,7 +300,7 @@ impl SongItemsCreatorWorker {
 
                 let new_video = videos_entity::ActiveModel {
                     video_id: ActiveValue::set(entry.video_id.clone()),
-                    channel_id: ActiveValue::set(i64::from(channel.id)),
+                    channel_id: ActiveValue::set(channel.id),
                     title: ActiveValue::set(entry.title),
                     response_json: ActiveValue::set(response_json),
                     kind: ActiveValue::set(0),
@@ -423,7 +423,7 @@ pub async fn process_song_items_for_video(
             db,
             UpsertCommentParams {
                 comment_id: comment_info.comment_id,
-                video_id: i64::from(video.id),
+                video_id: video.id,
                 author: comment_info.author,
                 content: comment_info.content,
                 response_json: comment_info.response_json,
@@ -467,7 +467,7 @@ pub async fn process_song_items_for_video(
     let mut created = 0usize;
     for entry in dedup_song_entries(pending_entries) {
         let item = song_items::ActiveModel {
-            video_id: ActiveValue::set(i64::from(video.id)),
+            video_id: ActiveValue::set(video.id),
             latest_diff_id: ActiveValue::set(None),
             ..Default::default()
         }
@@ -483,8 +483,8 @@ pub async fn process_song_items_for_video(
 
         song_diffs_model::ActiveModel::create_auto(
             db,
-            i64::from(item.id),
-            Some(i64::from(entry.comment_id)),
+            item.id,
+            Some(entry.comment_id),
             time,
             Some(entry.title.trim().to_string()),
             Some(entry.author.trim().to_string()),
@@ -513,7 +513,7 @@ pub async fn backfill_history_for_video(
     db: &sea_orm::DatabaseConnection,
     video: &videos_entity::Model,
 ) -> Result<()> {
-    let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
+    let empty_diffs = find_empty_author_diffs(db, video.id).await?;
 
     for diff_row in empty_diffs {
         let Some(title) = &diff_row.title else {
@@ -544,7 +544,7 @@ pub async fn backfill_spotify_for_video(
     video: &videos_entity::Model,
     spotify_client: &SpotifyClient,
 ) -> Result<()> {
-    let empty_diffs = find_empty_author_diffs(db, i64::from(video.id)).await?;
+    let empty_diffs = find_empty_author_diffs(db, video.id).await?;
 
     for diff_row in empty_diffs {
         let Some(title) = &diff_row.title else {
@@ -630,7 +630,7 @@ async fn find_historical_author(
 /// Updates the `author` field of a song diff.
 async fn update_diff_author(
     db: &sea_orm::DatabaseConnection,
-    diff_id: i32,
+    diff_id: i64,
     author: &str,
 ) -> Result<()> {
     let Some(diff) = song_diffs_entity::Entity::find_by_id(diff_id)
@@ -652,7 +652,7 @@ async fn update_diff_author(
 /// Updates the `status` field of a song diff.
 async fn update_diff_status(
     db: &sea_orm::DatabaseConnection,
-    diff_id: i32,
+    diff_id: i64,
     status: i32,
 ) -> Result<()> {
     let Some(diff) = song_diffs_entity::Entity::find_by_id(diff_id)
@@ -709,7 +709,7 @@ fn build_published_at(
 mod tests {
     use super::{dedup_song_entries, PendingSongEntry};
 
-    fn entry(comment_id: i32, time: &str, title: &str, author: &str) -> PendingSongEntry {
+    fn entry(comment_id: i64, time: &str, title: &str, author: &str) -> PendingSongEntry {
         PendingSongEntry {
             comment_id,
             time: time.to_string(),

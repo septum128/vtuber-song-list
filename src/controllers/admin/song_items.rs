@@ -8,16 +8,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct SongItemResponse {
-    id: i32,
+    id: i64,
     video_id: i64,
-    latest_diff_id: Option<i32>,
+    latest_diff_id: Option<i64>,
     video: VideoInfo,
     diff: DiffInfo,
 }
 
 #[derive(Serialize)]
 struct VideoInfo {
-    id: i32,
+    id: i64,
     video_id: String,
     title: String,
     channel_id: i64,
@@ -170,7 +170,7 @@ async fn bulk_create(
 async fn delete(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
     let deleted = song_items::Model::delete_by_id(&ctx.db, id).await?;

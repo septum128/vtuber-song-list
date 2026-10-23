@@ -10,8 +10,8 @@ use super::session_prepare_data as pd;
 async fn member_can_create_diff_as_pending() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let video = pd::create_video(&ctx, i64::from(channel.id)).await;
-        let item = pd::create_song_item(&ctx, i64::from(video.id)).await;
+        let video = pd::create_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
 
         let user = pd::register_and_login(&request, "diffmember", "password123").await;
         let (key, val) = pd::auth_header(&user.token);
@@ -42,8 +42,8 @@ async fn member_can_create_diff_as_pending() {
 async fn admin_can_create_diff_as_approved() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let video = pd::create_video(&ctx, i64::from(channel.id)).await;
-        let item = pd::create_song_item(&ctx, i64::from(video.id)).await;
+        let video = pd::create_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
 
         let admin = pd::register_and_login(&request, "diffadmin", "password123").await;
         pd::make_admin(&ctx, "diffadmin").await;
@@ -86,8 +86,8 @@ async fn admin_can_create_diff_as_approved() {
 async fn cannot_create_diff_without_auth() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let video = pd::create_video(&ctx, i64::from(channel.id)).await;
-        let item = pd::create_song_item(&ctx, i64::from(video.id)).await;
+        let video = pd::create_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
 
         let res = request
             .post(&format!("/api/member/song_items/{}/song_diffs", item.id))
@@ -107,8 +107,8 @@ async fn cannot_create_diff_without_auth() {
 async fn can_list_diffs() {
     request::<App, _, _>(|request, ctx| async move {
         let channel = pd::create_channel(&ctx).await;
-        let video = pd::create_video(&ctx, i64::from(channel.id)).await;
-        let item = pd::create_song_item(&ctx, i64::from(video.id)).await;
+        let video = pd::create_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
 
         let user = pd::register_and_login(&request, "listdiffuser", "password123").await;
         let (key, val) = pd::auth_header(&user.token);

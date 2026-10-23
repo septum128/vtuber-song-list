@@ -27,7 +27,7 @@ struct DiffInfo {
 
 #[derive(Serialize)]
 struct VideoInfo {
-    id: i32,
+    id: i64,
     video_id: String,
     title: String,
     channel_id: i64,
@@ -38,9 +38,9 @@ struct VideoInfo {
 
 #[derive(Serialize)]
 struct SongItemResponse {
-    id: i32,
+    id: i64,
     video_id: i64,
-    latest_diff_id: Option<i32>,
+    latest_diff_id: Option<i64>,
     diff: DiffInfo,
     video: VideoInfo,
 }
@@ -73,7 +73,7 @@ impl From<SongItemRow> for SongItemResponse {
 #[debug_handler]
 async fn list_ids(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Response> {
     let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
-    let ids = favorites::Model::find_song_item_ids(&ctx.db, user.id.into()).await?;
+    let ids = favorites::Model::find_song_item_ids(&ctx.db, user.id).await?;
     format::json(FavoriteIdsResponse { song_item_ids: ids })
 }
 
@@ -81,7 +81,7 @@ async fn list_ids(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Resp
 #[debug_handler]
 async fn list(auth: auth::JWT, State(ctx): State<AppContext>) -> Result<Response> {
     let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
-    let rows = favorites::Model::find_song_items(&ctx.db, user.id.into()).await?;
+    let rows = favorites::Model::find_song_items(&ctx.db, user.id).await?;
     let items: Vec<SongItemResponse> = rows.into_iter().map(Into::into).collect();
     format::json(items)
 }
@@ -96,14 +96,14 @@ async fn create(
     let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
 
     // 既にお気に入り済みなら 200 を返す
-    if favorites::Model::find_by_user_and_song_item(&ctx.db, user.id.into(), body.song_item_id)
+    if favorites::Model::find_by_user_and_song_item(&ctx.db, user.id, body.song_item_id)
         .await?
         .is_some()
     {
         return format::json(serde_json::json!({ "song_item_id": body.song_item_id }));
     }
 
-    ActiveModel::create(&ctx.db, user.id.into(), body.song_item_id)
+    ActiveModel::create(&ctx.db, user.id, body.song_item_id)
         .await
         .map_err(|e| {
             tracing::error!(err = e.to_string(), "failed to create favorite");
@@ -124,7 +124,7 @@ async fn destroy(
     let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
 
     if let Some(fav) =
-        favorites::Model::find_by_user_and_song_item(&ctx.db, user.id.into(), song_item_id).await?
+        favorites::Model::find_by_user_and_song_item(&ctx.db, user.id, song_item_id).await?
     {
         use sea_orm::EntityTrait;
         favorites::Entity::delete_by_id(fav.id)

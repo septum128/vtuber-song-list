@@ -24,7 +24,7 @@ struct DiffInfo {
 
 #[derive(Serialize)]
 struct VideoInfo {
-    id: i32,
+    id: i64,
     video_id: String,
     title: String,
     channel_id: i64,
@@ -35,9 +35,9 @@ struct VideoInfo {
 
 #[derive(Serialize)]
 struct SongItemResponse {
-    id: i32,
+    id: i64,
     video_id: i64,
-    latest_diff_id: Option<i32>,
+    latest_diff_id: Option<i64>,
     diff: DiffInfo,
     video: VideoInfo,
 }
@@ -87,7 +87,7 @@ async fn list(
 }
 
 #[debug_handler]
-async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i32>) -> Result<Response> {
+async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i64>) -> Result<Response> {
     SongItemRow::find_by_id(&ctx.db, id)
         .await?
         .map_or_else(not_found, |row| format::json(SongItemResponse::from(row)))

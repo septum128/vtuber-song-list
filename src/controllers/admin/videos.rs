@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct VideoResponse {
-    id: i32,
+    id: i64,
     channel_id: i64,
     video_id: String,
     title: String,
@@ -77,13 +77,13 @@ struct FetchSetlistBody {
 
 #[derive(Debug, Deserialize)]
 struct BulkFetchSetlistBody {
-    video_ids: Vec<i32>,
+    video_ids: Vec<i64>,
     force: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
 struct BulkPublishBody {
-    video_ids: Vec<i32>,
+    video_ids: Vec<i64>,
     published: bool,
 }
 
@@ -188,7 +188,7 @@ async fn create(
 async fn update(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(body): Json<UpdateBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;
@@ -292,7 +292,7 @@ async fn process_bulk_row(
         &ctx.db,
         CreateVideoParams {
             video_id: info.video_id,
-            channel_id: channel.id.into(),
+            channel_id: channel.id,
             title: info.title,
             published_at,
             response_json: info.response_json,
@@ -360,7 +360,7 @@ async fn bulk_create(
 async fn fetch_setlist(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(body): Json<FetchSetlistBody>,
 ) -> Result<Response> {
     require_admin(&auth, &ctx).await?;

@@ -45,11 +45,11 @@ impl SongItemsParams {
 
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct SongItemRow {
-    pub id: i32,
+    pub id: i64,
     pub video_id: i64,
-    pub latest_diff_id: Option<i32>,
+    pub latest_diff_id: Option<i64>,
     // video fields
-    pub v_id: i32,
+    pub v_id: i64,
     pub v_video_id: String,
     pub v_title: String,
     pub v_channel_id: i64,
@@ -169,7 +169,7 @@ impl SongItemRow {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         let sql = r"
             SELECT
                 si.id, si.video_id, si.latest_diff_id,
@@ -249,7 +249,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn delete_by_id(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    pub async fn delete_by_id(db: &DatabaseConnection, id: i64) -> Result<bool, DbErr> {
         use super::_entities::song_diffs;
 
         // Null out latest_diff_id to avoid FK conflict.
@@ -263,7 +263,7 @@ impl Model {
 
         // Delete related song_diffs.
         song_diffs::Entity::delete_many()
-            .filter(song_diffs::Column::SongItemId.eq(i64::from(id)))
+            .filter(song_diffs::Column::SongItemId.eq(id))
             .exec(db)
             .await?;
 
@@ -296,7 +296,7 @@ impl ActiveModel {
 
         // Create the approved diff.
         let diff = song_diffs::ActiveModel {
-            song_item_id: ActiveValue::set(i64::from(item.id)),
+            song_item_id: ActiveValue::set(item.id),
             time: ActiveValue::set(params.time),
             title: ActiveValue::set(params.title),
             author: ActiveValue::set(params.author),

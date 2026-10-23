@@ -115,6 +115,9 @@ impl Model {
         }
 
         if params.only_song_lives.unwrap_or(0) >= 1 {
+            // Scoped here: a module-level import makes `u64::max` ambiguous.
+            use sea_orm::ExprTrait;
+
             let subquery = Query::select()
                 .expr(Expr::val(1i32))
                 .from(song_items::Entity)
@@ -186,7 +189,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Self>, DbErr> {
+    pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -211,7 +214,7 @@ impl Model {
     /// Returns `DbErr` on database failure.
     pub async fn update_status(
         db: &DatabaseConnection,
-        id: i32,
+        id: i64,
         status: i32,
     ) -> Result<Option<Self>, DbErr> {
         let Some(video) = Entity::find_by_id(id).one(db).await? else {
@@ -254,7 +257,7 @@ impl ActiveModel {
     /// Returns `DbErr` on database failure.
     pub async fn update_from_params(
         db: &DatabaseConnection,
-        id: i32,
+        id: i64,
         params: UpdateVideoParams,
     ) -> Result<Option<Model>, DbErr> {
         let Some(video) = Entity::find_by_id(id).one(db).await? else {
@@ -286,7 +289,7 @@ impl ActiveModel {
     /// Returns `DbErr` on database failure.
     pub async fn bulk_update_published(
         db: &DatabaseConnection,
-        ids: &[i32],
+        ids: &[i64],
         published: bool,
     ) -> Result<u64, DbErr> {
         let result = Entity::update_many()
