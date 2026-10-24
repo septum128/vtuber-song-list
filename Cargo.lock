@@ -534,7 +534,6 @@ dependencies = [
  "axum-core",
  "bytes",
  "cookie",
- "form_urlencoded",
  "futures-util",
  "http",
  "http-body",
@@ -542,6 +541,29 @@ dependencies = [
  "mime",
  "pin-project-lite",
  "rustversion",
+ "serde_core",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "axum-extra"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fef252edff26ddba56bbcdf2ee3307b8129acb86f5749b68990c168a6fcc9c76"
+dependencies = [
+ "axum",
+ "axum-core",
+ "bytes",
+ "form_urlencoded",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
  "serde_core",
  "serde_html_form",
  "serde_path_to_error",
@@ -3096,7 +3118,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-client-ip",
- "axum-extra",
+ "axum-extra 0.10.3",
  "axum-test",
  "backtrace_printer",
  "byte-unit",
@@ -6401,7 +6423,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
- "axum-extra",
+ "axum-extra 0.12.5",
  "chrono",
  "fluent-templates",
  "include_dir",
