@@ -22,7 +22,7 @@
     "react-hook-form": "^7.54.0",
     "sass": "^1.85.0",
     "styled-components": "^6.1.19",
-    "swr": "^2.3.0"
+    "swr": "^2.5.1"
   },
   "packageManager": "pnpm@10.32.1",
   "pnpm": {
