@@ -21,7 +21,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.91.0",
     "sass": "^1.85.0",
-    "styled-components": "^6.1.19",
+    "styled-components": "^6.6.0",
     "swr": "^2.5.1"
   },
   "packageManager": "pnpm@10.32.1",
