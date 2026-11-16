@@ -111,6 +111,24 @@ pub async fn create_video(ctx: &AppContext, channel_id: i64) -> videos::Model {
     .unwrap()
 }
 
+/// Inserts an unpublished video directly into the DB.
+pub async fn create_unpublished_video(ctx: &AppContext, channel_id: i64) -> videos::Model {
+    videos::ActiveModel {
+        channel_id: ActiveValue::set(channel_id),
+        video_id: ActiveValue::set("test_video_unpublished".to_string()),
+        title: ActiveValue::set("Unpublished Video".to_string()),
+        response_json: ActiveValue::set(serde_json::json!({})),
+        kind: ActiveValue::set(10),   // LIVE
+        status: ActiveValue::set(40), // COMPLETED
+        published: ActiveValue::set(false),
+        published_at: ActiveValue::set(chrono::Utc::now().fixed_offset()),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await
+    .unwrap()
+}
+
 /// Creates a song_item with an approved diff directly in the DB.
 pub async fn create_song_item(
     ctx: &AppContext,

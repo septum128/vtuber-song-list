@@ -59,7 +59,7 @@ async fn list(State(ctx): State<AppContext>, Query(q): Query<VideoListQuery>) ->
 
 #[debug_handler]
 async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i64>) -> Result<Response> {
-    videos::Model::find_by_id(&ctx.db, id)
+    videos::Model::find_published_by_id(&ctx.db, id)
         .await?
         .map_or_else(not_found, |video| format::json(VideoResponse::from(video)))
 }

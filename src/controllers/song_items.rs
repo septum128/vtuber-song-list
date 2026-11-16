@@ -88,7 +88,7 @@ async fn list(
 
 #[debug_handler]
 async fn get_one(State(ctx): State<AppContext>, Path(id): Path<i64>) -> Result<Response> {
-    SongItemRow::find_by_id(&ctx.db, id)
+    SongItemRow::find_published_by_id(&ctx.db, id)
         .await?
         .map_or_else(not_found, |row| format::json(SongItemResponse::from(row)))
 }
