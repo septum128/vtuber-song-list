@@ -1,6 +1,6 @@
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 
 pub use super::_entities::song_diffs::{self, ActiveModel, Entity, Model};
@@ -134,8 +134,8 @@ impl ActiveModel {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn create_auto(
-        db: &DatabaseConnection,
+    pub async fn create_auto<C: ConnectionTrait>(
+        db: &C,
         song_item_id: i64,
         comment_id: Option<i64>,
         time: Option<String>,
