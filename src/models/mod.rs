@@ -1,3 +1,5 @@
+// SeaORM generates `pub enum Relation {}` for entities without relations.
+#[allow(clippy::empty_enums)]
 pub mod _entities;
 pub mod channels;
 pub mod comments;
