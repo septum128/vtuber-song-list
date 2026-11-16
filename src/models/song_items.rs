@@ -170,7 +170,26 @@ impl SongItemRow {
     /// # Errors
     /// Returns `DbErr` on database failure.
     pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<Self>, DbErr> {
-        let sql = r"
+        Self::find_one(db, id, false).await
+    }
+
+    /// Returns a single song item with video and diff info, only if its video is published.
+    ///
+    /// # Errors
+    /// Returns `DbErr` on database failure.
+    pub async fn find_published_by_id(
+        db: &DatabaseConnection,
+        id: i64,
+    ) -> Result<Option<Self>, DbErr> {
+        Self::find_one(db, id, true).await
+    }
+
+    async fn find_one(
+        db: &DatabaseConnection,
+        id: i64,
+        published_only: bool,
+    ) -> Result<Option<Self>, DbErr> {
+        let mut sql = r"
             SELECT
                 si.id, si.video_id, si.latest_diff_id,
                 v.id        AS v_id,
@@ -188,7 +207,11 @@ impl SongItemRow {
             INNER JOIN channels c ON v.channel_id = c.id
             LEFT  JOIN song_diffs sd ON si.latest_diff_id = sd.id
             WHERE si.id = $1
-        ";
+        "
+        .to_string();
+        if published_only {
+            sql.push_str(" AND v.published = true");
+        }
         Self::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             sql,

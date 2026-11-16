@@ -5,3 +5,5 @@ mod prepare_data;
 mod session_prepare_data;
 mod sessions;
 mod song_diffs;
+mod song_items;
+mod videos;
