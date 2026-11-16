@@ -74,11 +74,23 @@ fn normalize_for_dedup(s: &str) -> String {
         .to_lowercase()
 }
 
-/// Filters out entries with an empty title or author, sorts the remainder by
+/// Filters out entries with an empty title, sorts the remainder by
 /// time, title, and author, then removes entries whose title+author
 /// (normalized) duplicate an earlier entry in the sorted order.
+///
+/// Entries with an empty author are kept so the author can be backfilled later,
+/// unless another entry has the same title with a known author.
 fn dedup_song_entries(mut entries: Vec<PendingSongEntry>) -> Vec<PendingSongEntry> {
-    entries.retain(|e| !e.title.trim().is_empty() && !e.author.trim().is_empty());
+    entries.retain(|e| !e.title.trim().is_empty());
+
+    let titles_with_author: std::collections::HashSet<String> = entries
+        .iter()
+        .filter(|e| !e.author.trim().is_empty())
+        .map(|e| normalize_for_dedup(&e.title))
+        .collect();
+    entries.retain(|e| {
+        !e.author.trim().is_empty() || !titles_with_author.contains(&normalize_for_dedup(&e.title))
+    });
 
     entries.sort_by(|a, b| {
         a.time
@@ -859,10 +871,10 @@ mod tests {
     }
 
     #[test]
-    fn removes_entries_with_empty_title_or_author() {
+    fn removes_entries_with_empty_title() {
         let entries = vec![
             entry(1, "00:01:00", "", "Artist A"),
-            entry(1, "00:02:00", "Song B", ""),
+            entry(1, "00:02:00", "  ", ""),
             entry(1, "00:03:00", "Song C", "Artist C"),
         ];
 
@@ -870,6 +882,51 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].title, "Song C");
+    }
+
+    #[test]
+    fn keeps_entries_with_empty_author_for_backfill() {
+        let entries = vec![
+            entry(1, "00:01:00", "Song A", ""),
+            entry(1, "00:02:00", "Song B", "Artist B"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|e| (e.title.as_str(), e.author.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("Song A", ""), ("Song B", "Artist B")]
+        );
+    }
+
+    #[test]
+    fn drops_empty_author_entry_when_same_title_has_author() {
+        let entries = vec![
+            entry(1, "00:01:00", "Song A", ""),
+            entry(2, "00:01:05", "song a", "Artist A"),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].comment_id, 2);
+        assert_eq!(result[0].author, "Artist A");
+    }
+
+    #[test]
+    fn dedups_empty_author_entries_with_same_title() {
+        let entries = vec![
+            entry(1, "00:01:00", "Song A", ""),
+            entry(2, "00:01:05", "Song A", " "),
+        ];
+
+        let result = dedup_song_entries(entries);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].comment_id, 1);
     }
 
     #[test]

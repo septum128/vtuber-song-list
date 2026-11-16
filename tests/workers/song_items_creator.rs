@@ -241,3 +241,31 @@ async fn keeps_existing_setlist_when_replace_fails() {
     );
     assert_eq!(video_status(ctx, video.id).await, VIDEO_STATUS_COMPLETED);
 }
+
+#[tokio::test]
+#[serial]
+async fn saves_entries_with_empty_author_for_backfill() {
+    let boot = boot_test::<App>().await.unwrap();
+    let ctx = &boot.app_context;
+    let video = create_video(ctx, STATUS_FETCHED).await;
+    let comment = create_comment(ctx, video.id).await;
+
+    let created = save_song_entries(
+        &ctx.db,
+        video.id,
+        vec![entry(comment.id, "00:01:00", "Unknown Artist Song", "")],
+        &[comment.id],
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(created, 1);
+    let diff = song_diffs::Entity::find()
+        .filter(song_diffs::Column::Title.eq("Unknown Artist Song"))
+        .one(&ctx.db)
+        .await
+        .unwrap()
+        .expect("Entry with an empty author should be saved");
+    assert_eq!(diff.author.as_deref(), Some(""));
+}
