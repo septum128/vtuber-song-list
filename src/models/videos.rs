@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
 use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection,
+    DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 
 use super::_entities::song_items;
@@ -226,8 +226,8 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn update_status(
-        db: &DatabaseConnection,
+    pub async fn update_status<C: ConnectionTrait>(
+        db: &C,
         id: i64,
         status: i32,
     ) -> Result<Option<Self>, DbErr> {
