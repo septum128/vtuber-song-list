@@ -61,6 +61,7 @@ struct VideoListResponse {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct VideoItem {
     id: String,
     snippet: VideoSnippet,
@@ -191,28 +192,7 @@ impl YouTubeClient {
             .error_for_status()?
             .json()
             .await?;
-        let items = resp
-            .items
-            .into_iter()
-            .map(|item| {
-                let snippet_json =
-                    serde_json::to_value(&item.snippet).unwrap_or(serde_json::Value::Null);
-                VideoInfo {
-                    video_id: item.id,
-                    title: item.snippet.title,
-                    published_at: item.snippet.published_at,
-                    actual_start_time: item
-                        .live_streaming_details
-                        .and_then(|d| d.actual_start_time),
-                    live_broadcast_content: item.snippet.live_broadcast_content,
-                    duration_seconds: item
-                        .content_details
-                        .map(|d| parse_iso8601_duration(&d.duration)),
-                    response_json: snippet_json,
-                }
-            })
-            .collect();
-        Ok(items)
+        Ok(resp.items.into_iter().map(VideoInfo::from).collect())
     }
 
     /// Fetches all comments for the given video from the `YouTube` Data API v3.
@@ -301,6 +281,25 @@ fn parse_rss_entries(xml: &str) -> Vec<RssEntry> {
         .collect()
 }
 
+impl From<VideoItem> for VideoInfo {
+    fn from(item: VideoItem) -> Self {
+        let snippet_json = serde_json::to_value(&item.snippet).unwrap_or(serde_json::Value::Null);
+        Self {
+            video_id: item.id,
+            title: item.snippet.title,
+            published_at: item.snippet.published_at,
+            actual_start_time: item
+                .live_streaming_details
+                .and_then(|d| d.actual_start_time),
+            live_broadcast_content: item.snippet.live_broadcast_content,
+            duration_seconds: item
+                .content_details
+                .map(|d| parse_iso8601_duration(&d.duration)),
+            response_json: snippet_json,
+        }
+    }
+}
+
 /// Parses an ISO 8601 duration string (e.g. `PT1M30S`) into total seconds.
 /// Returns 0 if the string cannot be parsed.
 fn parse_iso8601_duration(duration: &str) -> u64 {
@@ -342,5 +341,60 @@ impl serde::Serialize for CommentSnippet {
         map.serialize_entry("authorDisplayName", &self.author_display_name)?;
         map.serialize_entry("textDisplay", &self.text_display)?;
         map.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{VideoInfo, VideoListResponse};
+
+    fn parse(json: &serde_json::Value) -> Vec<VideoInfo> {
+        let resp: VideoListResponse = serde_json::from_value(json.clone()).unwrap();
+        resp.items.into_iter().map(VideoInfo::from).collect()
+    }
+
+    #[test]
+    fn reads_content_details_and_live_streaming_details() {
+        let json = serde_json::json!({
+            "items": [{
+                "id": "abc123",
+                "snippet": {
+                    "title": "歌枠",
+                    "publishedAt": "2026-11-01T10:00:00Z",
+                    "liveBroadcastContent": "none"
+                },
+                "contentDetails": { "duration": "PT1H2M3S" },
+                "liveStreamingDetails": { "actualStartTime": "2026-11-01T12:00:00Z" }
+            }]
+        });
+
+        let videos = parse(&json);
+
+        assert_eq!(videos.len(), 1);
+        assert_eq!(videos[0].video_id, "abc123");
+        assert_eq!(videos[0].duration_seconds, Some(3723));
+        assert_eq!(
+            videos[0].actual_start_time.as_deref(),
+            Some("2026-11-01T12:00:00Z")
+        );
+    }
+
+    #[test]
+    fn missing_details_are_none() {
+        let json = serde_json::json!({
+            "items": [{
+                "id": "def456",
+                "snippet": {
+                    "title": "動画",
+                    "publishedAt": "2026-11-01T10:00:00Z",
+                    "liveBroadcastContent": "none"
+                }
+            }]
+        });
+
+        let videos = parse(&json);
+
+        assert_eq!(videos[0].duration_seconds, None);
+        assert_eq!(videos[0].actual_start_time, None);
     }
 }

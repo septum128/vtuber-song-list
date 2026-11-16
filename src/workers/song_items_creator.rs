@@ -1,6 +1,7 @@
 use loco_rs::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DbBackend, FromQueryResult, QueryFilter, Statement,
+    sea_query::Expr, ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DbBackend,
+    FromQueryResult, QueryFilter, QuerySelect, Statement, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 
@@ -55,11 +56,11 @@ fn is_song_live(title: &str) -> bool {
 }
 
 /// A setlist entry extracted from a comment, still tied to its source comment.
-struct PendingSongEntry {
-    comment_id: i64,
-    time: String,
-    title: String,
-    author: String,
+pub struct PendingSongEntry {
+    pub comment_id: i64,
+    pub time: String,
+    pub title: String,
+    pub author: String,
 }
 
 /// Normalizes a string for dedup comparison: trims, collapses whitespace
@@ -337,8 +338,13 @@ impl SongItemsCreatorWorker {
             if !is_song_live(&video.title) {
                 continue;
             }
+            // Song items already exist; only the backfill steps remain for this video.
+            if video.status >= STATUS_SONG_ITEMS_CREATED {
+                continue;
+            }
             let count =
-                process_song_items_for_video(db, &video, youtube_client, openai_client).await?;
+                process_song_items_for_video(db, &video, youtube_client, openai_client, false)
+                    .await?;
             if count > 0 {
                 processed += 1;
                 created += count;
@@ -383,26 +389,34 @@ impl SongItemsCreatorWorker {
     }
 }
 
-/// Fetches comments for `video` and creates song items from setlist comments.
+/// Fetches comments for `video`, extracts setlist entries, and saves them as song items.
+///
+/// When `replace_existing` is `true`, the video's existing song items and diffs are replaced
+/// with the newly extracted ones. If fetching fails or nothing is extracted, the existing
+/// setlist is left untouched.
 ///
 /// Returns the number of song items created.
 /// Sets status to `STATUS_SONG_ITEMS_CREATED` if any items were created,
-/// or `STATUS_COMMENTS_DISABLED` if the video has comments disabled.
+/// or `STATUS_COMMENTS_DISABLED` if the video has comments disabled (only when not replacing).
 /// The caller is responsible for keyword filtering (歌枠 etc.) if desired.
 ///
 /// # Errors
 /// Returns an error if the `YouTube` API, `OpenAI` API, or database operations fail.
-#[allow(clippy::too_many_lines)]
 pub async fn process_song_items_for_video(
     db: &sea_orm::DatabaseConnection,
     video: &videos_entity::Model,
     youtube_client: &YouTubeClient,
     openai_client: &OpenAIClient,
+    replace_existing: bool,
 ) -> Result<usize> {
-    let comments = match youtube_client.fetch_comments(&video.video_id).await {
-        Ok(c) => c,
-        Err(e) => {
-            if e.status() == Some(reqwest::StatusCode::FORBIDDEN) {
+    match extract_song_entries(db, video, youtube_client, openai_client).await? {
+        Extraction::CommentsDisabled => {
+            if replace_existing {
+                tracing::warn!(
+                    "Comments disabled for video {}, keeping existing setlist",
+                    video.video_id
+                );
+            } else {
                 tracing::warn!(
                     "Comments disabled for video {}, marking as skipped",
                     video.video_id
@@ -410,10 +424,44 @@ pub async fn process_song_items_for_video(
                 videos_model::Model::update_status(db, video.id, STATUS_COMMENTS_DISABLED)
                     .await
                     .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-            } else {
-                tracing::warn!("Failed to fetch comments for video {}: {e}", video.video_id);
             }
-            return Ok(0);
+            Ok(0)
+        }
+        Extraction::FetchFailed => Ok(0),
+        Extraction::Extracted {
+            entries,
+            comment_ids,
+        } => save_song_entries(db, video.id, entries, &comment_ids, replace_existing).await,
+    }
+}
+
+/// Outcome of fetching comments and extracting setlist entries for a video.
+enum Extraction {
+    CommentsDisabled,
+    FetchFailed,
+    Extracted {
+        entries: Vec<PendingSongEntry>,
+        /// Setlist comments whose extraction succeeded.
+        comment_ids: Vec<i64>,
+    },
+}
+
+/// Fetches and stores comments for `video`, then extracts setlist entries via `OpenAI`.
+/// Does not create song items.
+async fn extract_song_entries(
+    db: &sea_orm::DatabaseConnection,
+    video: &videos_entity::Model,
+    youtube_client: &YouTubeClient,
+    openai_client: &OpenAIClient,
+) -> Result<Extraction> {
+    let comments = match youtube_client.fetch_comments(&video.video_id).await {
+        Ok(c) => c,
+        Err(e) => {
+            if e.status() == Some(reqwest::StatusCode::FORBIDDEN) {
+                return Ok(Extraction::CommentsDisabled);
+            }
+            tracing::warn!("Failed to fetch comments for video {}: {e}", video.video_id);
+            return Ok(Extraction::FetchFailed);
         }
     };
 
@@ -434,13 +482,14 @@ pub async fn process_song_items_for_video(
         saved_comments.push(saved);
     }
 
-    let mut pending_entries = Vec::new();
+    let mut entries = Vec::new();
+    let mut comment_ids = Vec::new();
     for comment in &saved_comments {
         if !comment.is_setlist() {
             continue;
         }
 
-        let entries = match openai_client.extract_setlist(&comment.content).await {
+        let extracted = match openai_client.extract_setlist(&comment.content).await {
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!("OpenAI failed for comment {}: {e}", comment.id);
@@ -448,30 +497,76 @@ pub async fn process_song_items_for_video(
             }
         };
 
-        for entry in entries {
-            pending_entries.push(PendingSongEntry {
+        for entry in extracted {
+            entries.push(PendingSongEntry {
                 comment_id: comment.id,
                 time: entry.time,
                 title: entry.title,
                 author: entry.author,
             });
         }
+        comment_ids.push(comment.id);
+    }
 
-        // Extraction succeeded (regardless of how many entries it produced),
-        // so this comment doesn't need to be reprocessed on the next run.
-        comments_model::Model::mark_completed(db, comment.id)
+    Ok(Extraction::Extracted {
+        entries,
+        comment_ids,
+    })
+}
+
+/// Saves extracted setlist entries for a video in a single transaction.
+///
+/// Entries are deduplicated first. When `replace_existing` is `true`, the video's existing
+/// song items and diffs are deleted in the same transaction; if no entries remain after
+/// deduplication, nothing is changed so the existing setlist is preserved.
+///
+/// `comment_ids` are marked as completed, and the video status is set to
+/// `STATUS_SONG_ITEMS_CREATED` if any items were created. If any step fails, nothing is saved.
+///
+/// Returns the number of song items created.
+///
+/// # Errors
+/// Returns an error if database operations fail.
+pub async fn save_song_entries(
+    db: &sea_orm::DatabaseConnection,
+    video_id: i64,
+    entries: Vec<PendingSongEntry>,
+    comment_ids: &[i64],
+    replace_existing: bool,
+) -> Result<usize> {
+    let entries = dedup_song_entries(entries);
+    if replace_existing && entries.is_empty() {
+        tracing::warn!(
+            "No setlist entries extracted for video {video_id}, keeping existing setlist"
+        );
+        return Ok(0);
+    }
+
+    let txn = db
+        .begin()
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    if replace_existing {
+        delete_video_setlist(&txn, video_id).await?;
+    }
+
+    // Extraction succeeded (regardless of how many entries it produced),
+    // so these comments don't need to be reprocessed on the next run.
+    for comment_id in comment_ids {
+        comments_model::Model::mark_completed(&txn, *comment_id)
             .await
             .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
     }
 
     let mut created = 0usize;
-    for entry in dedup_song_entries(pending_entries) {
+    for entry in entries {
         let item = song_items::ActiveModel {
-            video_id: ActiveValue::set(video.id),
+            video_id: ActiveValue::set(video_id),
             latest_diff_id: ActiveValue::set(None),
             ..Default::default()
         }
-        .insert(db)
+        .insert(&txn)
         .await
         .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
 
@@ -482,7 +577,7 @@ pub async fn process_song_items_for_video(
         };
 
         song_diffs_model::ActiveModel::create_auto(
-            db,
+            &txn,
             item.id,
             Some(entry.comment_id),
             time,
@@ -496,12 +591,57 @@ pub async fn process_song_items_for_video(
     }
 
     if created > 0 {
-        videos_model::Model::update_status(db, video.id, STATUS_SONG_ITEMS_CREATED)
+        videos_model::Model::update_status(&txn, video_id, STATUS_SONG_ITEMS_CREATED)
             .await
             .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
     }
 
+    txn.commit()
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
     Ok(created)
+}
+
+/// Deletes all song items and diffs for the video.
+async fn delete_video_setlist<C: ConnectionTrait>(db: &C, video_id: i64) -> Result<()> {
+    let item_ids: Vec<i64> = song_items::Entity::find()
+        .select_only()
+        .column(song_items::Column::Id)
+        .filter(song_items::Column::VideoId.eq(video_id))
+        .into_tuple()
+        .all(db)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    if item_ids.is_empty() {
+        return Ok(());
+    }
+
+    // Null latest_diff_id to avoid FK constraint violation when deleting song_diffs
+    song_items::Entity::update_many()
+        .col_expr(
+            song_items::Column::LatestDiffId,
+            Expr::value(Option::<i64>::None),
+        )
+        .filter(song_items::Column::Id.is_in(item_ids.clone()))
+        .exec(db)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    song_diffs_entity::Entity::delete_many()
+        .filter(song_diffs_entity::Column::SongItemId.is_in(item_ids.clone()))
+        .exec(db)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    song_items::Entity::delete_many()
+        .filter(song_items::Column::Id.is_in(item_ids))
+        .exec(db)
+        .await
+        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
+
+    Ok(())
 }
 
 /// Fills empty `author` fields for `video` from historical approved diffs with the same title.

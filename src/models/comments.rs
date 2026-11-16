@@ -1,6 +1,7 @@
 use regex::Regex;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr,
+    EntityTrait, QueryFilter,
 };
 
 pub use super::_entities::comments::{self, ActiveModel, Entity, Model};
@@ -39,7 +40,7 @@ impl Model {
     ///
     /// # Errors
     /// Returns `DbErr` on database failure.
-    pub async fn mark_completed(db: &DatabaseConnection, id: i64) -> Result<(), DbErr> {
+    pub async fn mark_completed<C: ConnectionTrait>(db: &C, id: i64) -> Result<(), DbErr> {
         let Some(comment) = Entity::find_by_id(id).one(db).await? else {
             return Ok(());
         };
