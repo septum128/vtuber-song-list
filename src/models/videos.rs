@@ -193,6 +193,20 @@ impl Model {
         Entity::find_by_id(id).one(db).await
     }
 
+    /// Finds a published video by primary key.
+    ///
+    /// # Errors
+    /// Returns `DbErr` on database failure.
+    pub async fn find_published_by_id(
+        db: &DatabaseConnection,
+        id: i64,
+    ) -> Result<Option<Self>, DbErr> {
+        Entity::find_by_id(id)
+            .filter(videos::Column::Published.eq(true))
+            .one(db)
+            .await
+    }
+
     /// Returns all videos that are not yet completed.
     ///
     /// # Errors
