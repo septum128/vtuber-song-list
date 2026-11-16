@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "staging"
+    ignore:
+      # Keep type definitions in line with the runtime Node version (22);
+      # bump the major version manually when the runtime is upgraded.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
