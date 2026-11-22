@@ -16,8 +16,7 @@ use crate::models::{
     song_diffs as song_diffs_model,
     videos::{
         self as videos_model, STATUS_COMMENTS_DISABLED, STATUS_COMPLETED, STATUS_FETCHED,
-        STATUS_FETCHED_HISTORY, STATUS_SONG_ITEMS_CREATED, STATUS_SPOTIFY_COMPLETED,
-        STATUS_SPOTIFY_FETCHED,
+        STATUS_FETCHED_HISTORY, STATUS_SONG_ITEMS_CREATED,
     },
 };
 
@@ -404,8 +403,8 @@ impl SongItemsCreatorWorker {
 /// Fetches comments for `video`, extracts setlist entries, and saves them as song items.
 ///
 /// When `replace_existing` is `true`, the video's existing song items and diffs are replaced
-/// with the newly extracted ones. If fetching fails or nothing is extracted, the existing
-/// setlist is left untouched.
+/// with the newly extracted ones. If fetching fails, extraction fails for any setlist comment,
+/// or nothing is extracted, the existing setlist is left untouched.
 ///
 /// Returns the number of song items created.
 /// Sets status to `STATUS_SONG_ITEMS_CREATED` if any items were created,
@@ -440,9 +439,19 @@ pub async fn process_song_items_for_video(
             Ok(0)
         }
         Extraction::FetchFailed => Ok(0),
+        Extraction::Extracted { failed_count, .. } if replace_existing && failed_count > 0 => {
+            // Replacing with partial results would drop songs only found in the failed comments.
+            tracing::warn!(
+                "Extraction failed for {failed_count} setlist comment(s) of video {}, \
+                 keeping existing setlist",
+                video.video_id
+            );
+            Ok(0)
+        }
         Extraction::Extracted {
             entries,
             comment_ids,
+            ..
         } => save_song_entries(db, video.id, entries, &comment_ids, replace_existing).await,
     }
 }
@@ -455,6 +464,8 @@ enum Extraction {
         entries: Vec<PendingSongEntry>,
         /// Setlist comments whose extraction succeeded.
         comment_ids: Vec<i64>,
+        /// Number of setlist comments whose extraction failed.
+        failed_count: usize,
     },
 }
 
@@ -496,6 +507,7 @@ async fn extract_song_entries(
 
     let mut entries = Vec::new();
     let mut comment_ids = Vec::new();
+    let mut failed_count = 0usize;
     for comment in &saved_comments {
         if !comment.is_setlist() {
             continue;
@@ -505,6 +517,7 @@ async fn extract_song_entries(
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!("OpenAI failed for comment {}: {e}", comment.id);
+                failed_count += 1;
                 continue;
             }
         };
@@ -523,6 +536,7 @@ async fn extract_song_entries(
     Ok(Extraction::Extracted {
         entries,
         comment_ids,
+        failed_count,
     })
 }
 
@@ -687,7 +701,8 @@ pub async fn backfill_history_for_video(
 }
 
 /// Fills empty `author` fields for `video` using Spotify search.
-/// Sets status to `STATUS_COMPLETED`.
+/// Sets status to `STATUS_COMPLETED`, unless any search fails; the status is then left
+/// unchanged so the video is retried on the next run.
 ///
 /// # Errors
 /// Returns an error if database operations fail.
@@ -697,6 +712,7 @@ pub async fn backfill_spotify_for_video(
     spotify_client: &SpotifyClient,
 ) -> Result<()> {
     let empty_diffs = find_empty_author_diffs(db, video.id).await?;
+    let mut failed = false;
 
     for diff_row in empty_diffs {
         let Some(title) = &diff_row.title else {
@@ -709,15 +725,21 @@ pub async fn backfill_spotify_for_video(
         match spotify_client.search_artist(title).await {
             Ok(Some(author)) => {
                 update_diff_author(db, diff_row.id, &author).await?;
-                update_diff_status(db, diff_row.id, STATUS_SPOTIFY_COMPLETED).await?;
             }
-            Ok(None) => {
-                update_diff_status(db, diff_row.id, STATUS_SPOTIFY_FETCHED).await?;
-            }
+            Ok(None) => {}
             Err(e) => {
                 tracing::warn!("Spotify search failed for '{}': {e}", title);
+                failed = true;
             }
         }
+    }
+
+    if failed {
+        tracing::warn!(
+            "Spotify search failed for video {}, leaving it for retry",
+            video.video_id
+        );
+        return Ok(());
     }
 
     videos_model::Model::update_status(db, video.id, STATUS_COMPLETED)
@@ -794,28 +816,6 @@ async fn update_diff_author(
     };
     let mut active: song_diffs_entity::ActiveModel = diff.into();
     active.author = ActiveValue::set(Some(author.to_string()));
-    active
-        .update(db)
-        .await
-        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?;
-    Ok(())
-}
-
-/// Updates the `status` field of a song diff.
-async fn update_diff_status(
-    db: &sea_orm::DatabaseConnection,
-    diff_id: i64,
-    status: i32,
-) -> Result<()> {
-    let Some(diff) = song_diffs_entity::Entity::find_by_id(diff_id)
-        .one(db)
-        .await
-        .map_err(|e| loco_rs::Error::Any(Box::new(e)))?
-    else {
-        return Ok(());
-    };
-    let mut active: song_diffs_entity::ActiveModel = diff.into();
-    active.status = ActiveValue::set(status);
     active
         .update(db)
         .await

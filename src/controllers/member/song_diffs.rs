@@ -1,6 +1,7 @@
 use crate::models::{
     _entities::users,
     song_diffs::{self, ActiveModel, CreateSongDiffParams},
+    song_items::SongItemRow,
 };
 use axum::http::StatusCode;
 use loco_rs::prelude::*;
@@ -45,14 +46,33 @@ impl From<song_diffs::Model> for SongDiffResponse {
     }
 }
 
+/// Returns 404 unless the song item exists and the user may see it.
+/// Non-admin users may only access song items of published videos.
+async fn ensure_song_item_visible(
+    ctx: &AppContext,
+    user: &users::Model,
+    song_item_id: i64,
+) -> Result<()> {
+    if user.kind == USER_KIND_ADMIN {
+        return Ok(());
+    }
+    if SongItemRow::find_published_by_id(&ctx.db, song_item_id)
+        .await?
+        .is_none()
+    {
+        return not_found();
+    }
+    Ok(())
+}
+
 #[debug_handler]
 async fn list(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
     Path(song_item_id): Path<i64>,
 ) -> Result<Response> {
-    // Validate token is for an existing user.
-    let _user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
+    let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
+    ensure_song_item_visible(&ctx, &user, song_item_id).await?;
 
     let diffs = song_diffs::Model::find_by_song_item(&ctx.db, song_item_id).await?;
     let items: Vec<SongDiffResponse> = diffs.into_iter().map(Into::into).collect();
@@ -67,6 +87,7 @@ async fn create(
     Json(body): Json<CreateSongDiffBody>,
 ) -> Result<Response> {
     let user = users::Model::find_by_pid(&ctx.db, &auth.claims.pid).await?;
+    ensure_song_item_visible(&ctx, &user, song_item_id).await?;
 
     let diff = ActiveModel::create_from_params(
         &ctx.db,

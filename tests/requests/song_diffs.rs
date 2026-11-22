@@ -1,7 +1,7 @@
 use loco_rs::testing::prelude::*;
 use serial_test::serial;
 use vtuber_song_list::app::App;
-use vtuber_song_list::models::song_diffs::{STATUS_APPROVED, STATUS_PENDING};
+use vtuber_song_list::models::song_diffs::{self, STATUS_APPROVED, STATUS_PENDING};
 
 use super::session_prepare_data as pd;
 
@@ -132,6 +132,86 @@ async fn can_list_diffs() {
             !diffs.is_empty(),
             "Should return at least the initial approved diff plus the new pending diff"
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn member_cannot_list_diffs_of_unpublished_video() {
+    request::<App, _, _>(|request, ctx| async move {
+        let channel = pd::create_channel(&ctx).await;
+        let video = pd::create_unpublished_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
+
+        let user = pd::register_and_login(&request, "hiddenlistuser", "password123").await;
+        let (key, val) = pd::auth_header(&user.token);
+
+        let res = request
+            .get(&format!("/api/member/song_items/{}/song_diffs", item.id))
+            .add_header(key, val)
+            .await;
+
+        assert_eq!(res.status_code(), 404);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn member_cannot_create_diff_for_unpublished_video() {
+    request::<App, _, _>(|request, ctx| async move {
+        let channel = pd::create_channel(&ctx).await;
+        let video = pd::create_unpublished_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
+
+        let user = pd::register_and_login(&request, "hiddencreateuser", "password123").await;
+        let (key, val) = pd::auth_header(&user.token);
+
+        let res = request
+            .post(&format!("/api/member/song_items/{}/song_diffs", item.id))
+            .add_header(key, val)
+            .json(&serde_json::json!({ "title": "Hidden" }))
+            .await;
+
+        assert_eq!(res.status_code(), 404);
+        let diffs = song_diffs::Model::find_by_song_item(&ctx.db, item.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            diffs.len(),
+            1,
+            "No diff should be added to a hidden song item"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn admin_can_access_diffs_of_unpublished_video() {
+    request::<App, _, _>(|request, ctx| async move {
+        let channel = pd::create_channel(&ctx).await;
+        let video = pd::create_unpublished_video(&ctx, channel.id).await;
+        let item = pd::create_song_item(&ctx, video.id).await;
+
+        pd::register_and_login(&request, "hiddenadmin", "password123").await;
+        pd::make_admin(&ctx, "hiddenadmin").await;
+        let token = pd::login(&request, "hiddenadmin", "password123").await;
+        let (key, val) = pd::auth_header(&token);
+
+        let res = request
+            .get(&format!("/api/member/song_items/{}/song_diffs", item.id))
+            .add_header(key.clone(), val.clone())
+            .await;
+        assert_eq!(res.status_code(), 200);
+
+        let res = request
+            .post(&format!("/api/member/song_items/{}/song_diffs", item.id))
+            .add_header(key, val)
+            .json(&serde_json::json!({ "title": "Admin Hidden" }))
+            .await;
+        assert_eq!(res.status_code(), 201);
     })
     .await;
 }
