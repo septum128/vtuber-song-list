@@ -19,7 +19,7 @@
     "next": "^16.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hook-form": "^7.91.0",
+    "react-hook-form": "^7.92.0",
     "sass": "^1.108.2",
     "styled-components": "^6.6.0",
     "swr": "^2.5.1"
