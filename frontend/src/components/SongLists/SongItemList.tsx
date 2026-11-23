@@ -23,8 +23,23 @@ export function SongItemList({
   showEdit = false,
   showChannel = false,
 }: Props) {
+  const pagination = (
+    <Pagination
+      page={page}
+      perPage={perPage}
+      itemCount={items.length}
+      onPageChange={onPageChange}
+    />
+  );
+
+  // An empty page past the first still needs "前へ" to get back.
   if (items.length === 0) {
-    return <p className="text-body-secondary">曲が見つかりませんでした。</p>;
+    return (
+      <>
+        <p className="text-body-secondary">曲が見つかりませんでした。</p>
+        {pagination}
+      </>
+    );
   }
 
   return (
@@ -56,12 +71,7 @@ export function SongItemList({
           </tbody>
         </table>
       </div>
-      <Pagination
-        page={page}
-        perPage={perPage}
-        itemCount={items.length}
-        onPageChange={onPageChange}
-      />
+      {pagination}
     </>
   );
 }

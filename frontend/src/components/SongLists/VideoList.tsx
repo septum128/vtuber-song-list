@@ -10,8 +10,23 @@ type Props = {
 };
 
 export function VideoList({ videos, page, perPage, onPageChange }: Props) {
+  const pagination = (
+    <Pagination
+      page={page}
+      perPage={perPage}
+      itemCount={videos.length}
+      onPageChange={onPageChange}
+    />
+  );
+
+  // An empty page past the first still needs "前へ" to get back.
   if (videos.length === 0) {
-    return <p className="text-body-secondary">動画が見つかりませんでした。</p>;
+    return (
+      <>
+        <p className="text-body-secondary">動画が見つかりませんでした。</p>
+        {pagination}
+      </>
+    );
   }
 
   return (
@@ -23,12 +38,7 @@ export function VideoList({ videos, page, perPage, onPageChange }: Props) {
           </div>
         ))}
       </div>
-      <Pagination
-        page={page}
-        perPage={perPage}
-        itemCount={videos.length}
-        onPageChange={onPageChange}
-      />
+      {pagination}
     </>
   );
 }
